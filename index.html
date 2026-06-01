@@ -217,7 +217,7 @@
     border:1px solid var(--border);
     font-size:12px; font-weight:500;
     color:var(--muted); cursor:pointer;
-    transition:all 0.15s;
+    transition:all 0.15px;
     background:var(--bg);
   }
   .style-tag:hover { border-color:#999; color:var(--text); }
@@ -263,6 +263,8 @@
     overflow:hidden;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
   }
+
+  /* DOWNLOAD BUTTON */
   .img-download {
     width:28px; height:28px;
     border-radius:8px;
@@ -271,8 +273,27 @@
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; font-size:13px; flex-shrink:0;
     transition:all 0.15s; text-decoration:none;
+    color:var(--text);
   }
-  .img-download:hover { background:var(--text); border-color:var(--text); }
+  .img-download:hover { background:var(--text); border-color:var(--text); color:#fff; }
+
+  /* AUTO-DOWNLOAD BADGE */
+  .auto-dl-badge {
+    position:absolute; top:10px; right:10px;
+    background:rgba(0,0,0,0.7);
+    color:#fff; font-size:10px; font-weight:600;
+    letter-spacing:0.5px;
+    padding:4px 8px; border-radius:6px;
+    display:flex; align-items:center; gap:4px;
+    animation:fadeUp 0.3s ease;
+  }
+  .auto-dl-badge .dl-spin {
+    width:8px; height:8px;
+    border:1.5px solid rgba(255,255,255,0.3);
+    border-top-color:#fff;
+    border-radius:50%;
+    animation:spin 0.7s linear infinite;
+  }
 
   /* LOADING CARD */
   .loading-card {
@@ -388,6 +409,39 @@
   .sp-model-name { font-weight:700; margin-bottom:4px; }
   .sp-model-desc { font-size:12px; color:var(--muted); line-height:1.5; }
 
+  /* AUTO-DOWNLOAD TOGGLE in settings */
+  .sp-toggle-row {
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px;
+    margin-bottom:20px;
+  }
+  .sp-toggle-info { flex:1; }
+  .sp-toggle-title { font-size:13px; font-weight:600; margin-bottom:2px; }
+  .sp-toggle-desc { font-size:11px; color:var(--muted); }
+  .toggle-switch {
+    position:relative; width:40px; height:22px;
+    flex-shrink:0; margin-left:12px;
+  }
+  .toggle-switch input { opacity:0; width:0; height:0; }
+  .toggle-track {
+    position:absolute; inset:0;
+    background:#ddd; border-radius:100px;
+    cursor:pointer; transition:background 0.2s;
+  }
+  .toggle-track::after {
+    content:''; position:absolute;
+    width:16px; height:16px;
+    left:3px; top:3px;
+    background:#fff; border-radius:50%;
+    transition:transform 0.2s;
+    box-shadow:0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle-switch input:checked + .toggle-track { background:var(--text); }
+  .toggle-switch input:checked + .toggle-track::after { transform:translateX(18px); }
+
   /* TOAST */
   .toast {
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
@@ -501,6 +555,18 @@
       <button class="eye-btn" id="eye-btn" onclick="toggleEye()">👁️</button>
     </div>
 
+    <!-- AUTO-DOWNLOAD TOGGLE -->
+    <div class="sp-toggle-row">
+      <div class="sp-toggle-info">
+        <div class="sp-toggle-title">⬇ Auto-Download Images</div>
+        <div class="sp-toggle-desc">Automatically save each generated image to your device</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="auto-dl-toggle" checked>
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
     <button class="sp-save" onclick="saveKey()">Save & Connect</button>
 
     <div class="sp-link">
@@ -514,6 +580,7 @@
 
 <script>
   let apiKey = localStorage.getItem('umair_studio_key') || '';
+  let autoDownload = localStorage.getItem('umair_auto_dl') !== 'false'; // default ON
   let selectedStyle = '';
   let imgW = 512, imgH = 512;
   let isLoading = false;
@@ -531,6 +598,14 @@
       setStatus(true);
       document.getElementById('key-input').value = apiKey;
     }
+
+    // Sync toggle state
+    document.getElementById('auto-dl-toggle').checked = autoDownload;
+    document.getElementById('auto-dl-toggle').addEventListener('change', function() {
+      autoDownload = this.checked;
+      localStorage.setItem('umair_auto_dl', autoDownload);
+      showToast(autoDownload ? '⬇ Auto-download ON' : 'Auto-download OFF');
+    });
 
     // Style tags
     document.querySelectorAll('.style-tag').forEach(tag => {
@@ -566,6 +641,7 @@
   function openSettings() {
     document.getElementById('overlay').classList.add('open');
     document.getElementById('key-input').value = apiKey;
+    document.getElementById('auto-dl-toggle').checked = autoDownload;
   }
   function closeSettings() { document.getElementById('overlay').classList.remove('open'); }
   function closeOverlay(e) { if(e.target === document.getElementById('overlay')) closeSettings(); }
@@ -579,10 +655,12 @@
     const val = document.getElementById('key-input').value.trim();
     if (!val) { showToast('Please enter your API key'); return; }
     apiKey = val;
+    autoDownload = document.getElementById('auto-dl-toggle').checked;
     localStorage.setItem('umair_studio_key', apiKey);
+    localStorage.setItem('umair_auto_dl', autoDownload);
     setStatus(true);
     closeSettings();
-    showToast('✓ API Key saved successfully');
+    showToast('✓ Settings saved');
   }
 
   function showToast(msg) {
@@ -590,6 +668,27 @@
     t.textContent = msg;
     t.style.display = 'block';
     setTimeout(() => { t.style.display = 'none'; }, 2800);
+  }
+
+  // AUTO-DOWNLOAD FUNCTION
+  // Uses canvas to convert image to blob → triggers real download
+  async function downloadImageAuto(imgUrl, filename) {
+    try {
+      // Fetch image as blob to force download
+      const response = await fetch(imgUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    } catch(e) {
+      // Fallback: open in new tab
+      window.open(imgUrl, '_blank');
+    }
   }
 
   // GENERATE
@@ -662,41 +761,76 @@ Original: "${promptText}${styleHint}"`
       const seed = Math.floor(Math.random() * 999999);
       const encoded = encodeURIComponent(finalPrompt.substring(0, 600));
       const imgUrl = `https://image.pollinations.ai/prompt/${encoded}?width=${imgW}&height=${imgH}&seed=${seed}&nologo=true&enhance=true`;
+      const filename = `umair-studio-${seed}.jpg`;
 
       // Load image
       const img = new Image();
+      img.crossOrigin = 'anonymous';
 
-      img.onload = () => {
+      img.onload = async () => {
         loadCard.className = 'img-card';
         loadCard.innerHTML = `
-          <img src="${imgUrl}" alt="${promptText}">
+          <img src="${imgUrl}" alt="${promptText}" crossorigin="anonymous">
           <div class="img-card-meta">
             <div class="img-card-prompt">${promptText}</div>
-            <a class="img-download" href="${imgUrl}" download="umair-studio-${seed}.jpg" target="_blank" title="Download">⬇</a>
+            <a class="img-download" href="${imgUrl}" download="${filename}" target="_blank" title="Download">⬇</a>
           </div>
         `;
+
         isLoading = false;
         btn.disabled = false;
         btn.classList.remove('loading');
+
+        // AUTO-DOWNLOAD
+        if (autoDownload) {
+          // Show downloading badge
+          const badge = document.createElement('div');
+          badge.className = 'auto-dl-badge';
+          badge.innerHTML = '<div class="dl-spin"></div> Saving…';
+          loadCard.appendChild(badge);
+
+          await downloadImageAuto(imgUrl, filename);
+
+          badge.innerHTML = '✓ Saved';
+          setTimeout(() => badge.remove(), 2000);
+          showToast('⬇ Image saved to Downloads');
+        }
       };
 
-      img.onerror = () => {
+      img.onerror = async () => {
         // Try without enhance
         const fallbackUrl = `https://image.pollinations.ai/prompt/${encoded}?width=${imgW}&height=${imgH}&seed=${seed}&nologo=true`;
         const img2 = new Image();
-        img2.onload = () => {
+        img2.crossOrigin = 'anonymous';
+
+        img2.onload = async () => {
           loadCard.className = 'img-card';
           loadCard.innerHTML = `
-            <img src="${fallbackUrl}" alt="${promptText}">
+            <img src="${fallbackUrl}" alt="${promptText}" crossorigin="anonymous">
             <div class="img-card-meta">
               <div class="img-card-prompt">${promptText}</div>
-              <a class="img-download" href="${fallbackUrl}" download="umair-studio-${seed}.jpg" target="_blank" title="Download">⬇</a>
+              <a class="img-download" href="${fallbackUrl}" download="${filename}" target="_blank" title="Download">⬇</a>
             </div>
           `;
+
           isLoading = false;
           btn.disabled = false;
           btn.classList.remove('loading');
+
+          if (autoDownload) {
+            const badge = document.createElement('div');
+            badge.className = 'auto-dl-badge';
+            badge.innerHTML = '<div class="dl-spin"></div> Saving…';
+            loadCard.appendChild(badge);
+
+            await downloadImageAuto(fallbackUrl, filename);
+
+            badge.innerHTML = '✓ Saved';
+            setTimeout(() => badge.remove(), 2000);
+            showToast('⬇ Image saved to Downloads');
+          }
         };
+
         img2.onerror = () => {
           loadCard.className = 'error-card';
           loadCard.innerHTML = '<strong>Image generation failed</strong>Check your internet connection and try again.';
@@ -711,8 +845,8 @@ Original: "${promptText}${styleHint}"`
 
     } catch(err) {
       let msg = 'Something went wrong. Please try again.';
-      if (err.message.includes('401') || err.message.includes('key')) msg = 'Invalid API key. Please check Settings.';
-      else if (err.message.includes('429')) msg = 'Rate limit reached. Please wait a moment.';
+      if (err.message && err.message.includes('401')) msg = 'Invalid API key. Please check Settings.';
+      else if (err.message && err.message.includes('429')) msg = 'Rate limit reached. Please wait a moment.';
 
       loadCard.className = 'error-card';
       loadCard.innerHTML = `<strong>Error</strong>${msg}`;
