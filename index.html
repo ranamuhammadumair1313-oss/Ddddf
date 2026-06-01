@@ -108,12 +108,38 @@
   }
   .settings-icon-btn:hover { background:var(--card); border-color:var(--text); }
 
+  /* TABS */
+  .tabs {
+    display:flex; gap:0;
+    border-bottom:1px solid var(--border);
+    background:var(--bg);
+    position:sticky; top:60px; z-index:90;
+  }
+  .tab-btn {
+    flex:1; max-width:200px;
+    padding:14px 20px;
+    font-family:'Inter',sans-serif;
+    font-size:13px; font-weight:600;
+    color:var(--muted);
+    background:transparent;
+    border:none; border-bottom:2px solid transparent;
+    cursor:pointer;
+    transition:all 0.2s;
+    display:flex; align-items:center; justify-content:center; gap:7px;
+  }
+  .tab-btn:hover { color:var(--text); }
+  .tab-btn.active { color:var(--text); border-bottom-color:var(--text); }
+
   /* MAIN LAYOUT */
   .main {
     max-width:900px;
     margin:0 auto;
     padding:48px 24px 80px;
   }
+
+  /* TAB PANELS */
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
 
   /* HERO */
   .hero {
@@ -263,8 +289,6 @@
     overflow:hidden;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
   }
-
-  /* DOWNLOAD BUTTON */
   .img-download {
     width:28px; height:28px;
     border-radius:8px;
@@ -273,27 +297,8 @@
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; font-size:13px; flex-shrink:0;
     transition:all 0.15s; text-decoration:none;
-    color:var(--text);
   }
-  .img-download:hover { background:var(--text); border-color:var(--text); color:#fff; }
-
-  /* AUTO-DOWNLOAD BADGE */
-  .auto-dl-badge {
-    position:absolute; top:10px; right:10px;
-    background:rgba(0,0,0,0.7);
-    color:#fff; font-size:10px; font-weight:600;
-    letter-spacing:0.5px;
-    padding:4px 8px; border-radius:6px;
-    display:flex; align-items:center; gap:4px;
-    animation:fadeUp 0.3s ease;
-  }
-  .auto-dl-badge .dl-spin {
-    width:8px; height:8px;
-    border:1.5px solid rgba(255,255,255,0.3);
-    border-top-color:#fff;
-    border-radius:50%;
-    animation:spin 0.7s linear infinite;
-  }
+  .img-download:hover { background:var(--text); border-color:var(--text); }
 
   /* LOADING CARD */
   .loading-card {
@@ -339,6 +344,170 @@
   .empty-state .e-icon { font-size:48px; margin-bottom:12px; filter:grayscale(1); }
   .empty-state h3 { font-size:16px; font-weight:600; color:var(--text); margin-bottom:6px; }
   .empty-state p { font-size:13px; }
+
+  /* ===================== CHAT UI ===================== */
+  .chat-hero {
+    text-align:center;
+    margin-bottom:36px;
+  }
+  .chat-hero h1 {
+    font-size:clamp(28px,5vw,48px);
+    font-weight:900;
+    letter-spacing:-2px;
+    line-height:1;
+    margin-bottom:10px;
+  }
+  .chat-hero p { font-size:15px; color:var(--muted); }
+
+  .chat-container {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:20px;
+    overflow:hidden;
+    display:flex; flex-direction:column;
+    height:520px;
+  }
+
+  .chat-messages {
+    flex:1; overflow-y:auto;
+    padding:20px;
+    display:flex; flex-direction:column;
+    gap:14px;
+    scroll-behavior:smooth;
+  }
+  .chat-messages::-webkit-scrollbar { width:4px; }
+  .chat-messages::-webkit-scrollbar-track { background:transparent; }
+  .chat-messages::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  .chat-empty {
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:10px; color:var(--muted); text-align:center;
+    padding:40px;
+  }
+  .chat-empty .ce-icon { font-size:40px; filter:grayscale(1); }
+  .chat-empty h3 { font-size:15px; font-weight:600; color:var(--text); }
+  .chat-empty p { font-size:13px; line-height:1.5; }
+
+  .msg {
+    display:flex; gap:10px;
+    animation:fadeUp 0.25s ease;
+    max-width:80%;
+  }
+  .msg.user { align-self:flex-end; flex-direction:row-reverse; }
+  .msg.ai { align-self:flex-start; }
+
+  .msg-avatar {
+    width:30px; height:30px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; flex-shrink:0;
+    border:1px solid var(--border);
+    background:var(--bg);
+  }
+  .msg.user .msg-avatar { background:var(--text); border-color:var(--text); }
+
+  .msg-bubble {
+    padding:11px 15px;
+    border-radius:16px;
+    font-size:14px; line-height:1.6;
+    border:1px solid var(--border);
+  }
+  .msg.user .msg-bubble {
+    background:var(--text); color:#fff;
+    border-color:var(--text);
+    border-top-right-radius:4px;
+  }
+  .msg.ai .msg-bubble {
+    background:var(--bg); color:var(--text);
+    border-top-left-radius:4px;
+  }
+
+  .msg-typing .msg-bubble {
+    display:flex; align-items:center; gap:5px;
+    padding:14px 18px;
+  }
+  .dot-pulse { display:flex; gap:4px; }
+  .dot-pulse span {
+    width:6px; height:6px; border-radius:50%;
+    background:var(--muted);
+    animation:dotBounce 1.2s infinite;
+  }
+  .dot-pulse span:nth-child(2){ animation-delay:0.2s; }
+  .dot-pulse span:nth-child(3){ animation-delay:0.4s; }
+  @keyframes dotBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+  .chat-footer {
+    border-top:1px solid var(--border);
+    padding:14px 16px;
+    display:flex; gap:10px; align-items:flex-end;
+    background:var(--bg);
+  }
+
+  .chat-input {
+    flex:1;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:11px 15px;
+    font-family:'Inter',sans-serif;
+    font-size:14px; color:var(--text);
+    outline:none; resize:none;
+    min-height:44px; max-height:120px;
+    line-height:1.5;
+    transition:border-color 0.2s, box-shadow 0.2s;
+  }
+  .chat-input:focus {
+    border-color:#999;
+    box-shadow:0 0 0 3px rgba(0,0,0,0.04);
+  }
+  .chat-input::placeholder { color:#bbb; }
+
+  .chat-send-btn {
+    width:44px; height:44px;
+    border-radius:12px;
+    background:var(--text); color:#fff;
+    border:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; flex-shrink:0;
+    transition:all 0.2s;
+  }
+  .chat-send-btn:hover { background:#333; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+  .chat-send-btn:disabled { background:#ccc; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  .chat-send-btn .send-spinner {
+    width:16px; height:16px;
+    border:2px solid rgba(255,255,255,0.3);
+    border-top-color:#fff;
+    border-radius:50%;
+    animation:spin 0.7s linear infinite;
+    display:none;
+  }
+  .chat-send-btn.loading .send-spinner { display:block; }
+  .chat-send-btn.loading .send-icon { display:none; }
+
+  .chat-clear-btn {
+    height:44px;
+    border-radius:12px;
+    background:transparent; color:var(--muted);
+    border:1px solid var(--border);
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-family:'Inter',sans-serif;
+    padding:0 14px; flex-shrink:0;
+    transition:all 0.2s;
+    gap:5px;
+  }
+  .chat-clear-btn:hover { border-color:var(--danger); color:var(--danger); }
+
+  .chat-model-badge {
+    display:flex; align-items:center; gap:6px;
+    padding:8px 14px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    font-size:11px; color:var(--muted);
+    font-weight:500; letter-spacing:0.5px;
+  }
+  .chat-model-badge span { color:var(--success); }
 
   /* SETTINGS OVERLAY */
   .overlay {
@@ -409,39 +578,6 @@
   .sp-model-name { font-weight:700; margin-bottom:4px; }
   .sp-model-desc { font-size:12px; color:var(--muted); line-height:1.5; }
 
-  /* AUTO-DOWNLOAD TOGGLE in settings */
-  .sp-toggle-row {
-    display:flex; align-items:center; justify-content:space-between;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:12px;
-    padding:14px;
-    margin-bottom:20px;
-  }
-  .sp-toggle-info { flex:1; }
-  .sp-toggle-title { font-size:13px; font-weight:600; margin-bottom:2px; }
-  .sp-toggle-desc { font-size:11px; color:var(--muted); }
-  .toggle-switch {
-    position:relative; width:40px; height:22px;
-    flex-shrink:0; margin-left:12px;
-  }
-  .toggle-switch input { opacity:0; width:0; height:0; }
-  .toggle-track {
-    position:absolute; inset:0;
-    background:#ddd; border-radius:100px;
-    cursor:pointer; transition:background 0.2s;
-  }
-  .toggle-track::after {
-    content:''; position:absolute;
-    width:16px; height:16px;
-    left:3px; top:3px;
-    background:#fff; border-radius:50%;
-    transition:transform 0.2s;
-    box-shadow:0 1px 3px rgba(0,0,0,0.2);
-  }
-  .toggle-switch input:checked + .toggle-track { background:var(--text); }
-  .toggle-switch input:checked + .toggle-track::after { transform:translateX(18px); }
-
   /* TOAST */
   .toast {
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
@@ -460,6 +596,9 @@
     .hero h1{letter-spacing:-1px;}
     .prompt-footer{flex-direction:column; align-items:stretch;}
     .gen-btn{justify-content:center;}
+    .tab-btn { font-size:12px; padding:12px 12px; }
+    .msg { max-width:92%; }
+    .chat-container { height:460px; }
   }
 </style>
 </head>
@@ -484,54 +623,96 @@
   </div>
 </header>
 
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('imagine', this)">🖼️ Imagine</button>
+  <button class="tab-btn" onclick="switchTab('chat', this)">💬 Chat</button>
+</div>
+
 <!-- MAIN -->
 <main class="main">
 
-  <!-- HERO -->
-  <div class="hero">
-    <h1>Create<br>with AI</h1>
-    <p>Type a description. Get a stunning image. Powered by AI.</p>
-  </div>
+  <!-- ============ IMAGINE TAB ============ -->
+  <div class="tab-panel active" id="tab-imagine">
+    <!-- HERO -->
+    <div class="hero">
+      <h1>Create<br>with AI</h1>
+      <p>Type a description. Get a stunning image. Powered by AI.</p>
+    </div>
 
-  <!-- STYLE TAGS -->
-  <div class="style-row" id="style-row">
-    <div class="style-tag active" data-style="">✦ No Style</div>
-    <div class="style-tag" data-style="photorealistic, 8K, ultra detailed, sharp focus">📷 Photorealistic</div>
-    <div class="style-tag" data-style="digital art, concept art, vibrant, trending on artstation">🎮 Digital Art</div>
-    <div class="style-tag" data-style="anime style, manga, studio ghibli inspired, beautiful">🌸 Anime</div>
-    <div class="style-tag" data-style="oil painting, classical painting, museum quality, detailed brushwork">🖼️ Oil Painting</div>
-    <div class="style-tag" data-style="watercolor illustration, soft colors, artistic, beautiful">🎨 Watercolor</div>
-    <div class="style-tag" data-style="cinematic, movie still, dramatic lighting, 35mm film">🎬 Cinematic</div>
-    <div class="style-tag" data-style="minimalist, flat design, clean, simple, geometric">◻ Minimal</div>
-    <div class="style-tag" data-style="3D render, octane render, hyperrealistic, studio lighting">🧊 3D Render</div>
-  </div>
+    <!-- STYLE TAGS -->
+    <div class="style-row" id="style-row">
+      <div class="style-tag active" data-style="">✦ No Style</div>
+      <div class="style-tag" data-style="photorealistic, 8K, ultra detailed, sharp focus">📷 Photorealistic</div>
+      <div class="style-tag" data-style="digital art, concept art, vibrant, trending on artstation">🎮 Digital Art</div>
+      <div class="style-tag" data-style="anime style, manga, studio ghibli inspired, beautiful">🌸 Anime</div>
+      <div class="style-tag" data-style="oil painting, classical painting, museum quality, detailed brushwork">🖼️ Oil Painting</div>
+      <div class="style-tag" data-style="watercolor illustration, soft colors, artistic, beautiful">🎨 Watercolor</div>
+      <div class="style-tag" data-style="cinematic, movie still, dramatic lighting, 35mm film">🎬 Cinematic</div>
+      <div class="style-tag" data-style="minimalist, flat design, clean, simple, geometric">◻ Minimal</div>
+      <div class="style-tag" data-style="3D render, octane render, hyperrealistic, studio lighting">🧊 3D Render</div>
+    </div>
 
-  <!-- PROMPT BOX -->
-  <div class="prompt-box">
-    <textarea class="prompt-textarea" id="prompt-input"
-      placeholder="Describe your image... e.g. a lone astronaut standing on Mars, golden sunset, cinematic"
-      oninput="autoResize(this)"></textarea>
-    <div class="prompt-footer">
-      <div class="size-group">
-        <button class="size-btn active" data-w="512" data-h="512">1:1</button>
-        <button class="size-btn" data-w="768" data-h="512">3:2</button>
-        <button class="size-btn" data-w="512" data-h="768">2:3</button>
-        <button class="size-btn" data-w="896" data-h="512">16:9</button>
+    <!-- PROMPT BOX -->
+    <div class="prompt-box">
+      <textarea class="prompt-textarea" id="prompt-input"
+        placeholder="Describe your image… e.g. a lone astronaut standing on Mars, golden sunset, cinematic"
+        oninput="autoResize(this)"></textarea>
+      <div class="prompt-footer">
+        <div class="size-group">
+          <button class="size-btn active" data-w="512" data-h="512">1:1</button>
+          <button class="size-btn" data-w="768" data-h="512">3:2</button>
+          <button class="size-btn" data-w="512" data-h="768">2:3</button>
+          <button class="size-btn" data-w="896" data-h="512">16:9</button>
+        </div>
+        <button class="gen-btn" id="gen-btn" onclick="generateImage()">
+          <div class="btn-spinner"></div>
+          <span class="btn-text">✦ Generate</span>
+        </button>
       </div>
-      <button class="gen-btn" id="gen-btn" onclick="generateImage()">
-        <div class="btn-spinner"></div>
-        <span class="btn-text">✦ Generate</span>
-      </button>
+    </div>
+
+    <!-- GALLERY -->
+    <div class="gallery-label" id="gallery-label" style="display:none">Generated Images</div>
+    <div class="gallery" id="gallery">
+      <div class="empty-state">
+        <div class="e-icon">🖼️</div>
+        <h3>Your gallery is empty</h3>
+        <p>Describe an image above and click Generate</p>
+      </div>
     </div>
   </div>
 
-  <!-- GALLERY -->
-  <div class="gallery-label" id="gallery-label" style="display:none">Generated Images</div>
-  <div class="gallery" id="gallery">
-    <div class="empty-state">
-      <div class="e-icon">🖼️</div>
-      <h3>Your gallery is empty</h3>
-      <p>Describe an image above and click Generate</p>
+  <!-- ============ CHAT TAB ============ -->
+  <div class="tab-panel" id="tab-chat">
+    <div class="chat-hero">
+      <h1>Chat<br>with AI</h1>
+      <p>Ask anything. Get smart answers. Powered by Llama 3.3 70B.</p>
+    </div>
+
+    <div class="chat-container">
+      <div class="chat-model-badge">
+        🤖 Model: Llama 3.3 70B &nbsp;·&nbsp; <span>● Live</span>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-empty" id="chat-empty">
+          <div class="ce-icon">💬</div>
+          <h3>Start a conversation</h3>
+          <p>Ask me anything — coding, writing,<br>ideas, questions, anything at all.</p>
+        </div>
+      </div>
+      <div class="chat-footer">
+        <textarea class="chat-input" id="chat-input"
+          placeholder="Type your message…"
+          rows="1"
+          oninput="chatAutoResize(this)"
+          onkeydown="chatKeydown(event)"></textarea>
+        <button class="chat-clear-btn" onclick="clearChat()" title="Clear chat">🗑️</button>
+        <button class="chat-send-btn" id="chat-send-btn" onclick="sendChat()">
+          <div class="send-spinner"></div>
+          <span class="send-icon">➤</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -542,29 +723,17 @@
   <div class="settings-panel">
     <button class="sp-close" onclick="closeSettings()">✕</button>
     <div class="sp-title">API Settings</div>
-    <div class="sp-sub">Connect your OpenRouter key to start generating</div>
+    <div class="sp-sub">Connect your OpenRouter key to start using the studio</div>
 
     <div class="sp-model-info">
       <div class="sp-model-name">🤖 Model: Llama 3.3 70B Instruct</div>
-      <div class="sp-model-desc">Free model via OpenRouter. No payment needed. Fast, reliable, and works perfectly for image prompt enhancement.</div>
+      <div class="sp-model-desc">Free model via OpenRouter. No payment needed. Fast, reliable — powers both image prompt enhancement and the AI chat.</div>
     </div>
 
     <label class="sp-label">OpenRouter API Key</label>
     <div class="sp-input-wrap">
       <input class="sp-input" type="password" id="key-input" placeholder="sk-or-v1-..." autocomplete="off">
       <button class="eye-btn" id="eye-btn" onclick="toggleEye()">👁️</button>
-    </div>
-
-    <!-- AUTO-DOWNLOAD TOGGLE -->
-    <div class="sp-toggle-row">
-      <div class="sp-toggle-info">
-        <div class="sp-toggle-title">⬇ Auto-Download Images</div>
-        <div class="sp-toggle-desc">Automatically save each generated image to your device</div>
-      </div>
-      <label class="toggle-switch">
-        <input type="checkbox" id="auto-dl-toggle" checked>
-        <span class="toggle-track"></span>
-      </label>
     </div>
 
     <button class="sp-save" onclick="saveKey()">Save & Connect</button>
@@ -580,34 +749,26 @@
 
 <script>
   let apiKey = localStorage.getItem('umair_studio_key') || '';
-  let autoDownload = localStorage.getItem('umair_auto_dl') !== 'false'; // default ON
   let selectedStyle = '';
   let imgW = 512, imgH = 512;
   let isLoading = false;
+  let chatHistory = [];
+  let chatLoading = false;
 
-  // LOADER
+  // ── LOADER ──
   window.addEventListener('load', () => {
     setTimeout(() => {
       document.getElementById('loader').classList.add('hidden');
     }, 2200);
   });
 
-  // INIT
+  // ── INIT ──
   function init() {
     if (apiKey) {
       setStatus(true);
       document.getElementById('key-input').value = apiKey;
     }
 
-    // Sync toggle state
-    document.getElementById('auto-dl-toggle').checked = autoDownload;
-    document.getElementById('auto-dl-toggle').addEventListener('change', function() {
-      autoDownload = this.checked;
-      localStorage.setItem('umair_auto_dl', autoDownload);
-      showToast(autoDownload ? '⬇ Auto-download ON' : 'Auto-download OFF');
-    });
-
-    // Style tags
     document.querySelectorAll('.style-tag').forEach(tag => {
       tag.addEventListener('click', () => {
         document.querySelectorAll('.style-tag').forEach(t => t.classList.remove('active'));
@@ -616,7 +777,6 @@
       });
     });
 
-    // Size buttons
     document.querySelectorAll('.size-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
@@ -637,11 +797,18 @@
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   }
 
-  // SETTINGS
+  // ── TABS ──
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  // ── SETTINGS ──
   function openSettings() {
     document.getElementById('overlay').classList.add('open');
     document.getElementById('key-input').value = apiKey;
-    document.getElementById('auto-dl-toggle').checked = autoDownload;
   }
   function closeSettings() { document.getElementById('overlay').classList.remove('open'); }
   function closeOverlay(e) { if(e.target === document.getElementById('overlay')) closeSettings(); }
@@ -655,12 +822,10 @@
     const val = document.getElementById('key-input').value.trim();
     if (!val) { showToast('Please enter your API key'); return; }
     apiKey = val;
-    autoDownload = document.getElementById('auto-dl-toggle').checked;
     localStorage.setItem('umair_studio_key', apiKey);
-    localStorage.setItem('umair_auto_dl', autoDownload);
     setStatus(true);
     closeSettings();
-    showToast('✓ Settings saved');
+    showToast('✓ API Key saved successfully');
   }
 
   function showToast(msg) {
@@ -670,28 +835,7 @@
     setTimeout(() => { t.style.display = 'none'; }, 2800);
   }
 
-  // AUTO-DOWNLOAD FUNCTION
-  // Uses canvas to convert image to blob → triggers real download
-  async function downloadImageAuto(imgUrl, filename) {
-    try {
-      // Fetch image as blob to force download
-      const response = await fetch(imgUrl);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-    } catch(e) {
-      // Fallback: open in new tab
-      window.open(imgUrl, '_blank');
-    }
-  }
-
-  // GENERATE
+  // ── IMAGE GENERATE ──
   async function generateImage() {
     if (isLoading) return;
     if (!apiKey) { openSettings(); return; }
@@ -707,159 +851,219 @@
     const gallery = document.getElementById('gallery');
     document.getElementById('gallery-label').style.display = 'block';
 
-    // Remove empty state
     const empty = gallery.querySelector('.empty-state');
     if (empty) empty.remove();
 
-    // Add loading card
     const loadCard = document.createElement('div');
     loadCard.className = 'loading-card';
-    loadCard.innerHTML = `
-      <div class="loading-placeholder">
-        <div class="loading-shimmer"></div>
-        <div class="loading-label">Creating your image…</div>
-      </div>
-    `;
+    loadCard.innerHTML = `<div class="loading-placeholder"><div class="loading-shimmer"></div><div class="loading-label">Creating your image…</div></div>`;
     gallery.prepend(loadCard);
 
     try {
-      // Step 1: Enhance prompt via OpenRouter (free Llama model)
       let enhancedPrompt = promptText;
       const styleHint = selectedStyle ? `, ${selectedStyle}` : '';
 
       try {
         const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + apiKey,
-            'HTTP-Referer': 'https://umair-studio.github.io',
-            'X-Title': 'Umair AI Studio'
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'Authorization':'Bearer ' + apiKey,
+            'HTTP-Referer':'https://umair-studio.github.io',
+            'X-Title':'Umair AI Studio'
           },
           body: JSON.stringify({
             model: 'meta-llama/llama-3.3-70b-instruct:free',
-            max_tokens: 150,
-            messages: [{
-              role: 'user',
-              content: `Rewrite this image prompt to be more detailed and vivid for an AI image generator. Keep it under 100 words. Only output the prompt, nothing else.
-
-Original: "${promptText}${styleHint}"`
+            max_tokens: 200,
+            messages:[{
+              role:'user',
+              content:`Enhance this image prompt for an AI image generator. Make it detailed, vivid and descriptive. Return ONLY the enhanced prompt, nothing else:\n"${promptText}${styleHint}"`
             }]
           })
         });
         const data = await res.json();
-        if (!data.error && data.choices?.[0]?.message?.content) {
+        if (data.choices?.[0]?.message?.content) {
           enhancedPrompt = data.choices[0].message.content.trim();
         }
       } catch(e) {
-        // Use original prompt if enhancement fails
+        enhancedPrompt = promptText + (styleHint ? ', ' + selectedStyle : '');
       }
 
-      const finalPrompt = enhancedPrompt + styleHint;
+      const seed = Math.floor(Math.random() * 99999999);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=${imgW}&height=${imgH}&seed=${seed}&nologo=true`;
 
-      // Step 2: Generate image via Pollinations.ai (free, no key needed)
-      const seed = Math.floor(Math.random() * 999999);
-      const encoded = encodeURIComponent(finalPrompt.substring(0, 600));
-      const imgUrl = `https://image.pollinations.ai/prompt/${encoded}?width=${imgW}&height=${imgH}&seed=${seed}&nologo=true&enhance=true`;
-      const filename = `umair-studio-${seed}.jpg`;
-
-      // Load image
       const img = new Image();
-      img.crossOrigin = 'anonymous';
-
-      img.onload = async () => {
-        loadCard.className = 'img-card';
-        loadCard.innerHTML = `
-          <img src="${imgUrl}" alt="${promptText}" crossorigin="anonymous">
+      img.onload = () => {
+        loadCard.remove();
+        const card = document.createElement('div');
+        card.className = 'img-card';
+        card.innerHTML = `
+          <img src="${imageUrl}" alt="${promptText}" loading="lazy">
           <div class="img-card-meta">
             <div class="img-card-prompt">${promptText}</div>
-            <a class="img-download" href="${imgUrl}" download="${filename}" target="_blank" title="Download">⬇</a>
-          </div>
-        `;
-
+            <a class="img-download" href="${imageUrl}" download="umair-studio.png" target="_blank" title="Download">⬇</a>
+          </div>`;
+        gallery.prepend(card);
         isLoading = false;
         btn.disabled = false;
         btn.classList.remove('loading');
-
-        // AUTO-DOWNLOAD
-        if (autoDownload) {
-          // Show downloading badge
-          const badge = document.createElement('div');
-          badge.className = 'auto-dl-badge';
-          badge.innerHTML = '<div class="dl-spin"></div> Saving…';
-          loadCard.appendChild(badge);
-
-          await downloadImageAuto(imgUrl, filename);
-
-          badge.innerHTML = '✓ Saved';
-          setTimeout(() => badge.remove(), 2000);
-          showToast('⬇ Image saved to Downloads');
-        }
       };
-
-      img.onerror = async () => {
-        // Try without enhance
-        const fallbackUrl = `https://image.pollinations.ai/prompt/${encoded}?width=${imgW}&height=${imgH}&seed=${seed}&nologo=true`;
-        const img2 = new Image();
-        img2.crossOrigin = 'anonymous';
-
-        img2.onload = async () => {
-          loadCard.className = 'img-card';
-          loadCard.innerHTML = `
-            <img src="${fallbackUrl}" alt="${promptText}" crossorigin="anonymous">
-            <div class="img-card-meta">
-              <div class="img-card-prompt">${promptText}</div>
-              <a class="img-download" href="${fallbackUrl}" download="${filename}" target="_blank" title="Download">⬇</a>
-            </div>
-          `;
-
-          isLoading = false;
-          btn.disabled = false;
-          btn.classList.remove('loading');
-
-          if (autoDownload) {
-            const badge = document.createElement('div');
-            badge.className = 'auto-dl-badge';
-            badge.innerHTML = '<div class="dl-spin"></div> Saving…';
-            loadCard.appendChild(badge);
-
-            await downloadImageAuto(fallbackUrl, filename);
-
-            badge.innerHTML = '✓ Saved';
-            setTimeout(() => badge.remove(), 2000);
-            showToast('⬇ Image saved to Downloads');
-          }
-        };
-
-        img2.onerror = () => {
-          loadCard.className = 'error-card';
-          loadCard.innerHTML = '<strong>Image generation failed</strong>Check your internet connection and try again.';
-          isLoading = false;
-          btn.disabled = false;
-          btn.classList.remove('loading');
-        };
-        img2.src = fallbackUrl;
+      img.onerror = () => {
+        loadCard.remove();
+        showError(gallery, 'Image generation failed. Try a different prompt.');
+        isLoading = false;
+        btn.disabled = false;
+        btn.classList.remove('loading');
       };
-
-      img.src = imgUrl;
+      img.src = imageUrl;
 
     } catch(err) {
-      let msg = 'Something went wrong. Please try again.';
-      if (err.message && err.message.includes('401')) msg = 'Invalid API key. Please check Settings.';
-      else if (err.message && err.message.includes('429')) msg = 'Rate limit reached. Please wait a moment.';
-
-      loadCard.className = 'error-card';
-      loadCard.innerHTML = `<strong>Error</strong>${msg}`;
+      loadCard.remove();
+      showError(gallery, err.message || 'Something went wrong.');
       isLoading = false;
       btn.disabled = false;
       btn.classList.remove('loading');
     }
   }
 
-  // Enter key support
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.ctrlKey) generateImage();
-  });
+  function showError(parent, msg) {
+    const el = document.createElement('div');
+    el.className = 'error-card';
+    el.innerHTML = `<strong>Error</strong>${msg}`;
+    parent.prepend(el);
+  }
+
+  // ── CHAT ──
+  function chatAutoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function chatKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
+  }
+
+  function clearChat() {
+    chatHistory = [];
+    const msgs = document.getElementById('chat-messages');
+    msgs.innerHTML = `
+      <div class="chat-empty" id="chat-empty">
+        <div class="ce-icon">💬</div>
+        <h3>Start a conversation</h3>
+        <p>Ask me anything — coding, writing,<br>ideas, questions, anything at all.</p>
+      </div>`;
+    showToast('Chat cleared');
+  }
+
+  function appendMessage(role, text) {
+    const msgs = document.getElementById('chat-messages');
+    const empty = document.getElementById('chat-empty');
+    if (empty) empty.remove();
+
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    const avatar = role === 'user' ? '👤' : '🤖';
+    div.innerHTML = `
+      <div class="msg-avatar">${avatar}</div>
+      <div class="msg-bubble">${escapeHtml(text)}</div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return div;
+  }
+
+  function appendTyping() {
+    const msgs = document.getElementById('chat-messages');
+    const empty = document.getElementById('chat-empty');
+    if (empty) empty.remove();
+
+    const div = document.createElement('div');
+    div.className = 'msg ai msg-typing';
+    div.id = 'typing-indicator';
+    div.innerHTML = `
+      <div class="msg-avatar">🤖</div>
+      <div class="msg-bubble">
+        <div class="dot-pulse"><span></span><span></span><span></span></div>
+      </div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function removeTyping() {
+    const t = document.getElementById('typing-indicator');
+    if (t) t.remove();
+  }
+
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/\n/g,'<br>');
+  }
+
+  async function sendChat() {
+    if (chatLoading) return;
+    if (!apiKey) { openSettings(); return; }
+
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    chatLoading = true;
+
+    const sendBtn = document.getElementById('chat-send-btn');
+    sendBtn.disabled = true;
+    sendBtn.classList.add('loading');
+
+    appendMessage('user', text);
+    chatHistory.push({ role: 'user', content: text });
+    appendTyping();
+
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey,
+          'HTTP-Referer': 'https://umair-studio.github.io',
+          'X-Title': 'Umair AI Studio'
+        },
+        body: JSON.stringify({
+          model: 'meta-llama/llama-3.3-70b-instruct:free',
+          max_tokens: 1000,
+          messages: [
+            { role: 'system', content: 'You are a helpful, friendly, and intelligent AI assistant. Be concise but thorough. Use a conversational tone.' },
+            ...chatHistory
+          ]
+        })
+      });
+
+      const data = await res.json();
+      removeTyping();
+
+      if (data.choices?.[0]?.message?.content) {
+        const reply = data.choices[0].message.content.trim();
+        chatHistory.push({ role: 'assistant', content: reply });
+        appendMessage('ai', reply);
+      } else if (data.error) {
+        appendMessage('ai', '⚠️ Error: ' + (data.error.message || 'Something went wrong. Check your API key.'));
+      } else {
+        appendMessage('ai', '⚠️ No response received. Please try again.');
+      }
+    } catch(err) {
+      removeTyping();
+      appendMessage('ai', '⚠️ Network error: ' + (err.message || 'Could not reach the API.'));
+    }
+
+    chatLoading = false;
+    sendBtn.disabled = false;
+    sendBtn.classList.remove('loading');
+  }
 
   init();
 </script>
