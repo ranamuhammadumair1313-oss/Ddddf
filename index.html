@@ -1,792 +1,1395 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-
-// ── Icons ────────────────────────────────────────────────────────────────────
-const Icon = ({ d, size = 20, className = "" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d={d} />
-  </svg>
-);
-const SendIcon = () => <Icon d="M22 2L11 13M22 2L15 22 11 13 2 9l20-7z" />;
-const TrashIcon = () => <Icon d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" size={16} />;
-const SettingsIcon = () => <Icon d="M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />;
-const PlusIcon = () => <Icon d="M12 5v14M5 12h14" />;
-const MenuIcon = () => <Icon d="M3 12h18M3 6h18M3 18h18" />;
-const CloseIcon = () => <Icon d="M18 6L6 18M6 6l12 12" />;
-const ImageIcon = () => <Icon d="M21 15a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h4l2 3h8a2 2 0 012 2z" size={18} />;
-const BotIcon = () => <Icon d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7H3a7 7 0 017-7h1V5.73A2 2 0 0110 4a2 2 0 012-2zM5 17v1a3 3 0 003 3h8a3 3 0 003-3v-1H5z" size={18} />;
-const EyeIcon = (props) => <Icon d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 100 6 3 3 0 000-6z" size={16} {...props} />;
-const EyeOffIcon = (props) => <Icon d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22" size={16} {...props} />;
-
-// ── Constants ────────────────────────────────────────────────────────────────
-const MODELS = [
-  { id: "deepseek/deepseek-chat-v3-0324:free", label: "DeepSeek V3 (Default)" },
-  { id: "openai/gpt-4o", label: "GPT-4o" },
-  { id: "openai/gpt-4-turbo", label: "GPT-4 Turbo" },
-  { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
-  { id: "anthropic/claude-3-haiku", label: "Claude 3 Haiku" },
-  { id: "google/gemini-pro-1.5", label: "Gemini Pro 1.5" },
-  { id: "meta-llama/llama-3.1-70b-instruct", label: "Llama 3.1 70B" },
-  { id: "mistralai/mistral-large", label: "Mistral Large" },
-  { id: "cohere/command-r-plus", label: "Cohere Command R+" },
-];
-
-const SUGGESTIONS = [
-  { icon: "🔬", label: "Science", prompt: "Explain a fascinating concept in science that most people don't know about." },
-  { icon: "📐", label: "Mathematics", prompt: "Show me an interesting unsolved problem in mathematics and explain it simply." },
-  { icon: "💻", label: "Coding Assistance", prompt: "Help me understand the best practices for writing clean, maintainable code." },
-  { icon: "✍️", label: "Creative Writing", prompt: "Give me a creative writing prompt and help me develop an interesting story idea." },
-  { icon: "🌍", label: "World History", prompt: "Tell me about a lesser-known historical event that changed the world." },
-  { icon: "🧠", label: "Philosophy", prompt: "What is the most compelling philosophical question humans have yet to answer?" },
-];
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-const genId = () => Math.random().toString(36).slice(2, 10);
-const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-function loadState() {
-  try {
-    return {
-      chats: JSON.parse(localStorage.getItem("uas_chats") || "[]"),
-      apiKey: localStorage.getItem("uas_apikey") || "",
-      model: localStorage.getItem("uas_model") || MODELS[0].id,
-    };
-  } catch { return { chats: [], apiKey: "", model: MODELS[0].id }; }
-}
-
-// ── Markdown-lite renderer ───────────────────────────────────────────────────
-function renderMarkdown(text) {
-  const lines = text.split("\n");
-  const out = [];
-  let inCode = false, codeLang = "", codeLines = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (!inCode && line.startsWith("```")) {
-      inCode = true; codeLang = line.slice(3).trim(); codeLines = []; i++; continue;
-    }
-    if (inCode && line.startsWith("```")) {
-      inCode = false;
-      out.push(
-        <div key={i} className="uas-code-block">
-          {codeLang && <div className="uas-code-lang">{codeLang}</div>}
-          <pre><code>{codeLines.join("\n")}</code></pre>
-        </div>
-      );
-      codeLines = []; i++; continue;
-    }
-    if (inCode) { codeLines.push(line); i++; continue; }
-    if (line.startsWith("### ")) { out.push(<h3 key={i} className="uas-h3">{line.slice(4)}</h3>); i++; continue; }
-    if (line.startsWith("## ")) { out.push(<h2 key={i} className="uas-h2">{line.slice(3)}</h2>); i++; continue; }
-    if (line.startsWith("# ")) { out.push(<h1 key={i} className="uas-h1">{line.slice(2)}</h1>); i++; continue; }
-    if (line.startsWith("- ") || line.startsWith("* ")) {
-      const items = [];
-      while (i < lines.length && (lines[i].startsWith("- ") || lines[i].startsWith("* "))) {
-        items.push(<li key={i}>{inlineFormat(lines[i].slice(2))}</li>);
-        i++;
-      }
-      out.push(<ul key={"ul" + i} className="uas-ul">{items}</ul>);
-      continue;
-    }
-    if (/^\d+\. /.test(line)) {
-      const items = [];
-      while (i < lines.length && /^\d+\. /.test(lines[i])) {
-        items.push(<li key={i}>{inlineFormat(lines[i].replace(/^\d+\. /, ""))}</li>);
-        i++;
-      }
-      out.push(<ol key={"ol" + i} className="uas-ol">{items}</ol>);
-      continue;
-    }
-    if (line.trim() === "") { out.push(<div key={i} className="uas-spacer" />); i++; continue; }
-    out.push(<p key={i} className="uas-p">{inlineFormat(line)}</p>);
-    i++;
-  }
-  return out;
-}
-
-function inlineFormat(text) {
-  const parts = [];
-  const regex = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|__[^_]+__|_[^_]+_)/g;
-  let last = 0, m;
-  while ((m = regex.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    const s = m[0];
-    if (s.startsWith("`")) parts.push(<code key={m.index} className="uas-inline-code">{s.slice(1, -1)}</code>);
-    else if (s.startsWith("**") || s.startsWith("__")) parts.push(<strong key={m.index}>{s.slice(2, -2)}</strong>);
-    else parts.push(<em key={m.index}>{s.slice(1, -1)}</em>);
-    last = m.index + s.length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts;
-}
-
-// ── Settings Modal ───────────────────────────────────────────────────────────
-function SettingsModal({ apiKey, model, onSave, onClose }) {
-  const [key, setKey] = useState(apiKey);
-  const [mod, setMod] = useState(model);
-  const [show, setShow] = useState(false);
-  return (
-    <div className="uas-overlay" onClick={onClose}>
-      <div className="uas-modal" onClick={e => e.stopPropagation()}>
-        <div className="uas-modal-header">
-          <h2>Settings</h2>
-          <button className="uas-icon-btn" onClick={onClose}><CloseIcon /></button>
-        </div>
-        <div className="uas-modal-body">
-          <label className="uas-label">OpenRouter API Key</label>
-          <div className="uas-input-wrap">
-            <input
-              className="uas-input"
-              type={show ? "text" : "password"}
-              placeholder="sk-or-..."
-              value={key}
-              onChange={e => setKey(e.target.value)}
-            />
-            <button className="uas-eye-btn" onClick={() => setShow(s => !s)}>
-              {show ? <EyeOffIcon /> : <EyeIcon />}
-            </button>
-          </div>
-          <label className="uas-label" style={{ marginTop: 18 }}>AI Model</label>
-          <select className="uas-select" value={mod} onChange={e => setMod(e.target.value)}>
-            {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-          </select>
-          <p className="uas-hint">Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="uas-link">openrouter.ai/keys</a></p>
-        </div>
-        <div className="uas-modal-footer">
-          <button className="uas-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="uas-btn-save" onClick={() => { onSave(key, mod); onClose(); }}>Save Settings</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Typing indicator ─────────────────────────────────────────────────────────
-function TypingDots() {
-  return (
-    <div className="uas-typing">
-      <span /><span /><span />
-    </div>
-  );
-}
-
-// ── Message bubble ───────────────────────────────────────────────────────────
-function Message({ msg }) {
-  const isUser = msg.role === "user";
-  return (
-    <div className={`uas-msg ${isUser ? "uas-msg-user" : "uas-msg-ai"}`}>
-      {!isUser && (
-        <div className="uas-avatar uas-avatar-ai">
-          <BotIcon />
-        </div>
-      )}
-      <div className={`uas-bubble ${isUser ? "uas-bubble-user" : "uas-bubble-ai"}`}>
-        {msg.image && (
-          <img src={msg.image} alt="uploaded" className="uas-msg-img" />
-        )}
-        {isUser
-          ? <p className="uas-p" style={{ margin: 0 }}>{msg.content}</p>
-          : renderMarkdown(msg.content)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UMAIR AI STUDIO - Advanced Chat</title>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sidebar: '#171717',
+                        main: '#212121',
+                        input: '#2f2f2f',
+                        bubble: '#2f2f2f',
+                        hover: '#2a2a2a',
+                        accent: '#10a37f',
+                        'accent-hover': '#0d8c6d',
+                    }
+                }
+            }
         }
-        <div className="uas-time">{msg.time}</div>
-      </div>
-      {isUser && (
-        <div className="uas-avatar uas-avatar-user">U</div>
-      )}
-    </div>
-  );
-}
-
-// ── Main App ─────────────────────────────────────────────────────────────────
-export default function App() {
-  const init = loadState();
-  const [chats, setChats] = useState(init.chats);
-  const [activeChatId, setActiveChatId] = useState(null);
-  const [apiKey, setApiKey] = useState(init.apiKey);
-  const [model, setModel] = useState(init.model);
-  const [input, setInput] = useState("");
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [error, setError] = useState("");
-  const bottomRef = useRef(null);
-  const fileRef = useRef(null);
-  const textRef = useRef(null);
-
-  const activeChat = chats.find(c => c.id === activeChatId) || null;
-  const messages = activeChat?.messages || [];
-
-  // persist
-  useEffect(() => { localStorage.setItem("uas_chats", JSON.stringify(chats)); }, [chats]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
-
-  const newChat = useCallback(() => {
-    const chat = { id: genId(), title: "New Chat", messages: [], createdAt: Date.now() };
-    setChats(prev => [chat, ...prev]);
-    setActiveChatId(chat.id);
-    setInput(""); setImageFile(null); setImagePreview(null); setError("");
-  }, []);
-
-  const deleteChat = useCallback((id, e) => {
-    e.stopPropagation();
-    setChats(prev => prev.filter(c => c.id !== id));
-    if (activeChatId === id) setActiveChatId(null);
-  }, [activeChatId]);
-
-  const saveSettings = (key, mod) => {
-    setApiKey(key); setModel(mod);
-    localStorage.setItem("uas_apikey", key);
-    localStorage.setItem("uas_model", mod);
-  };
-
-  const handleImage = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = ev => setImagePreview(ev.target.result);
-    reader.readAsDataURL(file);
-  };
-
-  const removeImage = () => { setImageFile(null); setImagePreview(null); if (fileRef.current) fileRef.current.value = ""; };
-
-  const sendMessage = useCallback(async (text = input) => {
-    const content = text.trim();
-    if (!content && !imageFile) return;
-    if (!apiKey) { setError("Please add your OpenRouter API key in Settings ⚙️"); return; }
-    setError("");
-
-    let chatId = activeChatId;
-    if (!chatId) {
-      const chat = { id: genId(), title: content.slice(0, 40) || "Image Chat", messages: [], createdAt: Date.now() };
-      setChats(prev => [chat, ...prev]);
-      chatId = chat.id;
-      setActiveChatId(chatId);
-    }
-
-    const userMsg = { id: genId(), role: "user", content, image: imagePreview, time: now() };
-
-    setChats(prev => prev.map(c => c.id === chatId
-      ? { ...c, title: c.messages.length === 0 ? (content.slice(0, 40) || "Image Chat") : c.title, messages: [...c.messages, userMsg] }
-      : c
-    ));
-    setInput(""); setImageFile(null); setImagePreview(null);
-    if (fileRef.current) fileRef.current.value = "";
-    setLoading(true);
-
-    try {
-      const msgContent = [];
-      if (imagePreview) msgContent.push({ type: "image_url", image_url: { url: imagePreview } });
-      if (content) msgContent.push({ type: "text", text: content });
-
-      const prevMessages = (chats.find(c => c.id === chatId)?.messages || []).map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "UMAIR AI STUDIO",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            ...prevMessages,
-            { role: "user", content: imagePreview ? msgContent : content },
-          ],
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `API error ${res.status}`);
-      }
-
-      const data = await res.json();
-      const aiText = data.choices?.[0]?.message?.content || "No response received.";
-      const aiMsg = { id: genId(), role: "assistant", content: aiText, time: now() };
-
-      setChats(prev => prev.map(c => c.id === chatId
-        ? { ...c, messages: [...c.messages, userMsg, aiMsg].filter((m, idx, arr) => arr.findIndex(x => x.id === m.id) === idx) }
-        : c
-      ));
-    } catch (err) {
-      setError(`Error: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [input, imageFile, imagePreview, activeChatId, apiKey, model, chats]);
-
-  const handleKey = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  };
-
-  const handleSuggestion = (prompt) => {
-    if (!activeChatId) {
-      sendMessage(prompt);
-    } else {
-      setInput(prompt);
-      textRef.current?.focus();
-    }
-  };
-
-  const modelLabel = MODELS.find(m => m.id === model)?.label || model;
-
-  return (
-    <>
-      <style>{CSS}</style>
-      <div className="uas-root">
-        {/* Sidebar */}
-        <aside className={`uas-sidebar ${sidebarOpen ? "uas-sidebar-open" : "uas-sidebar-closed"}`}>
-          <div className="uas-sidebar-header">
-            <span className="uas-logo-small">UAS</span>
-            <button className="uas-icon-btn" onClick={newChat} title="New Chat"><PlusIcon /></button>
-          </div>
-          <div className="uas-sidebar-chats">
-            {chats.length === 0 && <div className="uas-no-chats">No chats yet</div>}
-            {chats.map(c => (
-              <div
-                key={c.id}
-                className={`uas-chat-item ${c.id === activeChatId ? "uas-chat-active" : ""}`}
-                onClick={() => setActiveChatId(c.id)}
-              >
-                <span className="uas-chat-title">{c.title}</span>
-                <button className="uas-trash-btn" onClick={(e) => deleteChat(c.id, e)} title="Delete"><TrashIcon /></button>
-              </div>
-            ))}
-          </div>
-          <div className="uas-sidebar-footer">
-            <div className="uas-model-badge">
-              <span className="uas-model-dot" />
-              <span className="uas-model-name">{modelLabel.split("(")[0].trim()}</span>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main */}
-        <main className="uas-main">
-          {/* Topbar */}
-          <header className="uas-topbar">
-            <button className="uas-icon-btn" onClick={() => setSidebarOpen(s => !s)}>
-              <MenuIcon />
-            </button>
-            <span className="uas-topbar-title">
-              {activeChat ? activeChat.title : "UMAIR AI STUDIO"}
-            </span>
-            <button className="uas-icon-btn uas-settings-btn" onClick={() => setShowSettings(true)}>
-              <SettingsIcon />
-            </button>
-          </header>
-
-          {/* Chat area */}
-          <div className="uas-chat-area">
-            {!activeChatId ? (
-              <div className="uas-home">
-                <div className="uas-home-content">
-                  <div className="uas-home-logo">
-                    <div className="uas-orb" />
-                    <h1 className="uas-title">UMAIR AI STUDIO</h1>
-                    <p className="uas-subtitle">Your intelligent companion for everything</p>
-                  </div>
-                  <div className="uas-suggestions">
-                    {SUGGESTIONS.map((s, i) => (
-                      <button key={i} className="uas-suggestion-card" onClick={() => handleSuggestion(s.prompt)}>
-                        <span className="uas-sug-icon">{s.icon}</span>
-                        <span className="uas-sug-label">{s.label}</span>
-                        <span className="uas-sug-desc">{s.prompt.slice(0, 55)}…</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="uas-messages">
-                {messages.map(msg => <Message key={msg.id} msg={msg} />)}
-                {loading && (
-                  <div className="uas-msg uas-msg-ai">
-                    <div className="uas-avatar uas-avatar-ai"><BotIcon /></div>
-                    <div className="uas-bubble uas-bubble-ai"><TypingDots /></div>
-                  </div>
-                )}
-                <div ref={bottomRef} />
-              </div>
-            )}
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div className="uas-error">
-              <span>{error}</span>
-              <button onClick={() => setError("")}><CloseIcon /></button>
-            </div>
-          )}
-
-          {/* Input area */}
-          <div className="uas-input-area">
-            {imagePreview && (
-              <div className="uas-img-preview-wrap">
-                <img src={imagePreview} alt="preview" className="uas-img-preview" />
-                <button className="uas-img-remove" onClick={removeImage}><CloseIcon /></button>
-              </div>
-            )}
-            <div className="uas-input-box">
-              <input type="file" ref={fileRef} accept="image/*" onChange={handleImage} style={{ display: "none" }} />
-              <button className="uas-attach-btn" onClick={() => fileRef.current?.click()} title="Upload image">
-                <ImageIcon />
-              </button>
-              <textarea
-                ref={textRef}
-                className="uas-textarea"
-                placeholder="Message UMAIR AI STUDIO…"
-                value={input}
-                onChange={e => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"; }}
-                onKeyDown={handleKey}
-                rows={1}
-              />
-              <button
-                className={`uas-send-btn ${(input.trim() || imageFile) && !loading ? "uas-send-active" : ""}`}
-                onClick={() => sendMessage()}
-                disabled={loading || (!input.trim() && !imageFile)}
-              >
-                <SendIcon />
-              </button>
-            </div>
-            <p className="uas-disclaimer">AI can make mistakes. Verify important information.</p>
-          </div>
-        </main>
-
-        {showSettings && (
-          <SettingsModal
-            apiKey={apiKey}
-            model={model}
-            onSave={saveSettings}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
-      </div>
-    </>
-  );
-}
-
-// ── CSS ───────────────────────────────────────────────────────────────────────
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0d0d0f;
-    --bg2: #141418;
-    --bg3: #1c1c22;
-    --bg4: #242430;
-    --border: #2a2a36;
-    --text: #e8e8f0;
-    --text2: #9494a8;
-    --text3: #5c5c72;
-    --accent: #7c6af5;
-    --accent2: #a594ff;
-    --accent-glow: rgba(124,106,245,0.35);
-    --user-bubble: #1e1e2e;
-    --ai-bubble: #181820;
-    --danger: #f56565;
-    --success: #68d391;
-    --r: 14px;
-    --r-sm: 8px;
-    --shadow: 0 4px 24px rgba(0,0,0,0.4);
-  }
-
-  html, body, #root { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--text); }
-
-  .uas-root {
-    display: flex; height: 100vh; overflow: hidden;
-  }
-
-  /* ── Sidebar ── */
-  .uas-sidebar {
-    background: var(--bg2);
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    transition: width 0.25s ease;
-    overflow: hidden; flex-shrink: 0;
-  }
-  .uas-sidebar-open { width: 260px; }
-  .uas-sidebar-closed { width: 0; }
-
-  .uas-sidebar-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 14px; border-bottom: 1px solid var(--border);
-    min-width: 260px;
-  }
-  .uas-logo-small {
-    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px;
-    color: var(--accent2); letter-spacing: 2px;
-  }
-  .uas-sidebar-chats { flex: 1; overflow-y: auto; padding: 8px; min-width: 260px; }
-  .uas-sidebar-chats::-webkit-scrollbar { width: 4px; }
-  .uas-sidebar-chats::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-  .uas-no-chats { color: var(--text3); font-size: 13px; text-align: center; margin-top: 32px; }
-
-  .uas-chat-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 9px 10px; border-radius: var(--r-sm); cursor: pointer;
-    transition: background 0.15s; margin-bottom: 2px;
-  }
-  .uas-chat-item:hover { background: var(--bg3); }
-  .uas-chat-active { background: var(--bg4) !important; }
-  .uas-chat-title { flex: 1; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-  .uas-trash-btn {
-    background: none; border: none; cursor: pointer; color: var(--text3);
-    padding: 3px; border-radius: 4px; opacity: 0; transition: opacity 0.15s, color 0.15s;
-    display: flex; align-items: center;
-  }
-  .uas-chat-item:hover .uas-trash-btn { opacity: 1; }
-  .uas-trash-btn:hover { color: var(--danger); }
-
-  .uas-sidebar-footer { padding: 12px; border-top: 1px solid var(--border); min-width: 260px; }
-  .uas-model-badge {
-    display: flex; align-items: center; gap: 7px;
-    background: var(--bg3); border-radius: 20px; padding: 6px 12px;
-  }
-  .uas-model-dot { width: 7px; height: 7px; background: var(--success); border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px var(--success); }
-  .uas-model-name { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-  /* ── Main ── */
-  .uas-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
-
-  .uas-topbar {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 16px; border-bottom: 1px solid var(--border);
-    background: var(--bg); position: sticky; top: 0; z-index: 10;
-  }
-  .uas-topbar-title { flex: 1; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; color: var(--text); letter-spacing: 0.5px; }
-  .uas-settings-btn { margin-left: auto; }
-
-  .uas-icon-btn {
-    background: none; border: none; cursor: pointer; color: var(--text2);
-    padding: 6px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center;
-    transition: background 0.15s, color 0.15s;
-  }
-  .uas-icon-btn:hover { background: var(--bg3); color: var(--text); }
-
-  /* ── Chat area ── */
-  .uas-chat-area { flex: 1; overflow-y: auto; padding: 0; }
-  .uas-chat-area::-webkit-scrollbar { width: 5px; }
-  .uas-chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-  /* ── Home ── */
-  .uas-home { display: flex; align-items: center; justify-content: center; min-height: 100%; padding: 40px 20px; }
-  .uas-home-content { max-width: 700px; width: 100%; text-align: center; }
-
-  .uas-home-logo { margin-bottom: 40px; }
-  .uas-orb {
-    width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 20px;
-    background: radial-gradient(circle at 35% 35%, var(--accent2), var(--accent), #4a3fa8);
-    box-shadow: 0 0 40px var(--accent-glow), 0 0 80px rgba(124,106,245,0.15);
-    animation: orbPulse 3s ease-in-out infinite;
-  }
-  @keyframes orbPulse {
-    0%, 100% { box-shadow: 0 0 40px var(--accent-glow), 0 0 80px rgba(124,106,245,0.15); transform: scale(1); }
-    50% { box-shadow: 0 0 60px var(--accent-glow), 0 0 120px rgba(124,106,245,0.25); transform: scale(1.04); }
-  }
-  .uas-title {
-    font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(22px, 5vw, 38px);
-    background: linear-gradient(135deg, var(--text) 0%, var(--accent2) 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    letter-spacing: 2px; margin-bottom: 10px;
-  }
-  .uas-subtitle { color: var(--text2); font-size: 15px; font-weight: 300; }
-
-  .uas-suggestions {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-  }
-  @media (max-width: 600px) { .uas-suggestions { grid-template-columns: repeat(2, 1fr); } }
-
-  .uas-suggestion-card {
-    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r);
-    padding: 14px 12px; text-align: left; cursor: pointer;
-    display: flex; flex-direction: column; gap: 5px;
-    transition: border-color 0.2s, background 0.2s, transform 0.15s;
-  }
-  .uas-suggestion-card:hover { border-color: var(--accent); background: var(--bg3); transform: translateY(-2px); }
-  .uas-sug-icon { font-size: 20px; }
-  .uas-sug-label { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 13px; color: var(--text); }
-  .uas-sug-desc { font-size: 12px; color: var(--text2); line-height: 1.4; }
-
-  /* ── Messages ── */
-  .uas-messages { padding: 20px 16px; max-width: 780px; margin: 0 auto; width: 100%; }
-
-  .uas-msg { display: flex; gap: 10px; margin-bottom: 20px; align-items: flex-start; }
-  .uas-msg-user { flex-direction: row-reverse; }
-  .uas-msg-ai { flex-direction: row; }
-
-  .uas-avatar {
-    width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; flex-shrink: 0; margin-top: 2px;
-  }
-  .uas-avatar-user { background: var(--accent); color: #fff; }
-  .uas-avatar-ai { background: var(--bg3); border: 1px solid var(--border); color: var(--accent2); }
-
-  .uas-bubble { max-width: 78%; padding: 12px 16px; border-radius: var(--r); word-break: break-word; }
-  .uas-bubble-user { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
-  .uas-bubble-ai { background: var(--ai-bubble); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-
-  .uas-msg-img { max-width: 100%; max-height: 280px; border-radius: 8px; margin-bottom: 8px; display: block; }
-  .uas-time { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 6px; }
-  .uas-bubble-ai .uas-time { color: var(--text3); }
-
-  /* Markdown styles */
-  .uas-p { font-size: 14.5px; line-height: 1.7; margin-bottom: 6px; }
-  .uas-h1 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; margin: 12px 0 6px; color: var(--text); }
-  .uas-h2 { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 600; margin: 10px 0 5px; color: var(--text); }
-  .uas-h3 { font-size: 15px; font-weight: 600; margin: 8px 0 4px; color: var(--accent2); }
-  .uas-ul, .uas-ol { padding-left: 20px; margin: 6px 0; }
-  .uas-ul li, .uas-ol li { font-size: 14px; line-height: 1.7; margin-bottom: 3px; }
-  .uas-spacer { height: 6px; }
-  .uas-code-block {
-    background: #0a0a10; border: 1px solid var(--border); border-radius: var(--r-sm);
-    margin: 8px 0; overflow: auto;
-  }
-  .uas-code-lang { font-size: 11px; color: var(--text3); padding: 6px 12px 0; font-family: monospace; }
-  .uas-code-block pre { padding: 10px 14px; font-size: 13px; color: #c9d1d9; font-family: 'Fira Code', 'Cascadia Code', monospace; line-height: 1.6; }
-  .uas-inline-code { background: rgba(124,106,245,0.15); color: var(--accent2); padding: 1px 6px; border-radius: 4px; font-size: 13px; font-family: monospace; }
-
-  /* ── Typing ── */
-  .uas-typing { display: flex; gap: 5px; align-items: center; padding: 4px 0; }
-  .uas-typing span {
-    width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
-    animation: typingBounce 1.2s infinite ease-in-out;
-  }
-  .uas-typing span:nth-child(2) { animation-delay: 0.2s; }
-  .uas-typing span:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes typingBounce {
-    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-    30% { transform: translateY(-6px); opacity: 1; }
-  }
-
-  /* ── Error ── */
-  .uas-error {
-    background: rgba(245,101,101,0.1); border: 1px solid rgba(245,101,101,0.3);
-    color: #fc8181; font-size: 13px; padding: 10px 16px; margin: 0 16px 8px;
-    border-radius: var(--r-sm); display: flex; align-items: center; justify-content: space-between;
-    max-width: 780px; margin-left: auto; margin-right: auto;
-  }
-  .uas-error button { background: none; border: none; cursor: pointer; color: inherit; }
-
-  /* ── Input area ── */
-  .uas-input-area { padding: 12px 16px 16px; background: var(--bg); max-width: 780px; width: 100%; margin: 0 auto; }
-
-  .uas-img-preview-wrap {
-    position: relative; display: inline-block; margin-bottom: 10px;
-  }
-  .uas-img-preview { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
-  .uas-img-remove {
-    position: absolute; top: -6px; right: -6px;
-    background: var(--bg4); border: 1px solid var(--border); border-radius: 50%;
-    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: var(--text2);
-  }
-
-  .uas-input-box {
-    display: flex; align-items: flex-end; gap: 8px;
-    background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
-    padding: 8px 8px 8px 12px;
-    transition: border-color 0.2s;
-  }
-  .uas-input-box:focus-within { border-color: var(--accent); }
-
-  .uas-attach-btn {
-    background: none; border: none; cursor: pointer; color: var(--text2);
-    padding: 6px; border-radius: 8px; display: flex; align-items: center;
-    transition: color 0.15s, background 0.15s; flex-shrink: 0;
-  }
-  .uas-attach-btn:hover { color: var(--accent2); background: var(--bg3); }
-
-  .uas-textarea {
-    flex: 1; background: none; border: none; outline: none; resize: none;
-    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14.5px; line-height: 1.5;
-    max-height: 160px; overflow-y: auto; padding: 4px 0;
-  }
-  .uas-textarea::placeholder { color: var(--text3); }
-  .uas-textarea::-webkit-scrollbar { width: 3px; }
-
-  .uas-send-btn {
-    background: var(--bg4); border: none; cursor: pointer; color: var(--text3);
-    width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: background 0.15s, color 0.15s;
-  }
-  .uas-send-active { background: var(--accent) !important; color: #fff !important; }
-  .uas-send-btn:disabled { cursor: not-allowed; }
-
-  .uas-disclaimer { font-size: 11px; color: var(--text3); text-align: center; margin-top: 8px; }
-
-  /* ── Settings Modal ── */
-  .uas-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
-    display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px;
-  }
-  .uas-modal {
-    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r);
-    width: 100%; max-width: 440px; box-shadow: var(--shadow);
-    animation: slideUp 0.2s ease;
-  }
-  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-
-  .uas-modal-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 18px 20px; border-bottom: 1px solid var(--border);
-  }
-  .uas-modal-header h2 { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; }
-  .uas-modal-body { padding: 20px; }
-  .uas-modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid var(--border); }
-
-  .uas-label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
-  .uas-input-wrap { position: relative; }
-  .uas-input {
-    width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r-sm);
-    padding: 10px 38px 10px 12px; color: var(--text); font-size: 14px; outline: none;
-    transition: border-color 0.2s; font-family: 'DM Sans', sans-serif;
-  }
-  .uas-input:focus { border-color: var(--accent); }
-  .uas-eye-btn {
-    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; cursor: pointer; color: var(--text3);
-    display: flex; align-items: center; transition: color 0.15s;
-  }
-  .uas-eye-btn:hover { color: var(--text2); }
-  .uas-select {
-    width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r-sm);
-    padding: 10px 12px; color: var(--text); font-size: 14px; outline: none;
-    cursor: pointer; transition: border-color 0.2s; font-family: 'DM Sans', sans-serif;
-  }
-  .uas-select:focus { border-color: var(--accent); }
-  .uas-hint { font-size: 12px; color: var(--text3); margin-top: 12px; }
-  .uas-link { color: var(--accent2); text-decoration: none; }
-  .uas-link:hover { text-decoration: underline; }
-
-  .uas-btn-cancel {
-    background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r-sm);
-    padding: 9px 18px; color: var(--text2); font-size: 14px; cursor: pointer;
-    transition: background 0.15s;
-  }
-  .uas-btn-cancel:hover { background: var(--bg4); }
-  .uas-btn-save {
-    background: var(--accent); border: none; border-radius: var(--r-sm);
-    padding: 9px 20px; color: #fff; font-size: 14px; cursor: pointer; font-weight: 500;
-    transition: opacity 0.15s;
-  }
-  .uas-btn-save:hover { opacity: 0.88; }
-
-  @media (max-width: 640px) {
-    .uas-sidebar-open { width: 220px; }
-    .uas-messages { padding: 16px 12px; }
-    .uas-input-area { padding: 10px 12px 14px; }
-  }
-`;
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        * {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #212121;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+        #root {
+            height: 100vh;
+            width: 100vw;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 3px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+        textarea {
+            resize: none;
+            outline: none;
+            field-sizing: content;
+            min-height: 24px;
+            max-height: 200px;
+            line-height: 1.5;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes pulse-dot {
+            0%,
+            80%,
+            100% {
+                opacity: 0.3;
+                transform: scale(0.8);
+            }
+            40% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+        .pulse-dot {
+            animation: pulse-dot 1.4s infinite;
+        }
+        .pulse-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .pulse-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        .sidebar-transition {
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+        }
+        @media (max-width: 768px) {
+            .sidebar-mobile {
+                position: fixed;
+                z-index: 50;
+                height: 100vh;
+                left: 0;
+                top: 0;
+                transform: translateX(-100%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .sidebar-mobile.open {
+                transform: translateX(0);
+            }
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.6);
+                z-index: 45;
+            }
+            .sidebar-overlay.open {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js">
+    </script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js">
+    </script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js">
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, createContext, useContext } = React;
+
+        // ============ CONSTANTS ============
+        const STORAGE_KEY = 'umair_ai_studio_data';
+        const DEFAULT_MODEL = 'deepseek/deepseek-chat';
+
+        const AVAILABLE_MODELS = [
+            { id: 'deepseek/deepseek-chat', name: 'DeepSeek-V3', provider: 'DeepSeek', vision: false },
+            { id: 'deepseek/deepseek-r1', name: 'DeepSeek-R1', provider: 'DeepSeek', vision: false },
+            { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'OpenAI', vision: true },
+            { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI', vision: true },
+            { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic',
+            vision: true },
+            { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic', vision: true },
+            { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash', provider: 'Google',
+        vision: true },
+            { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'Google', vision: true },
+            { id: 'meta-llama/llama-3.2-90b-vision-instruct', name: 'Llama 3.2 90B Vision',
+                provider: 'Meta', vision: true },
+            { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', provider: 'Meta',
+            vision: false },
+            { id: 'mistralai/mistral-large', name: 'Mistral Large', provider: 'Mistral', vision: false },
+        ];
+
+        const SUGGESTIONS = [
+            {
+                title: 'Science',
+                prompt: 'Explain the concept of quantum entanglement in simple terms with real-world analogies.',
+                icon: '🔬',
+                color: 'from-blue-600/20 to-cyan-600/20 border-blue-500/30 hover:border-blue-400/60'
+            },
+            {
+                title: 'Mathematics',
+                prompt: 'Walk me through solving a complex calculus problem: find the derivative of f(x) = x³sin(x) + e²ˣ using the product and chain rules.',
+                icon: '📐',
+                color: 'from-purple-600/20 to-pink-600/20 border-purple-500/30 hover:border-purple-400/60'
+            },
+            {
+                title: 'Coding Assistance',
+                prompt: 'Write a Python function that implements a binary search tree with insert, delete, and search operations. Include time complexity analysis.',
+                icon: '💻',
+                color: 'from-green-600/20 to-emerald-600/20 border-green-500/30 hover:border-green-400/60'
+            },
+            {
+                title: 'Creative Writing',
+                prompt: 'Write a short story about a detective who discovers they can communicate with the memories stored in old photographs.',
+                icon: '✨',
+                color: 'from-orange-600/20 to-amber-600/20 border-orange-500/30 hover:border-orange-400/60'
+            },
+            {
+                title: 'History & Philosophy',
+                prompt: 'Compare and contrast the philosophical ideas of Stoicism and Existentialism. How do they each approach the meaning of life?',
+                icon: '🏛️',
+                color: 'from-red-600/20 to-rose-600/20 border-red-500/30 hover:border-red-400/60'
+            },
+            {
+                title: 'Technology Trends',
+                prompt: 'Analyze the current state of AI in 2025-2026. What are the most significant breakthroughs and where is the technology heading?',
+                icon: '🚀',
+                color: 'from-indigo-600/20 to-violet-600/20 border-indigo-500/30 hover:border-indigo-400/60'
+            },
+        ];
+
+        // ============ UTILS ============
+        function generateId() {
+            return 'chat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+        }
+
+        function loadFromStorage() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    return {
+                        chats: data.chats || [],
+                        settings: data.settings || { apiKey: '', model: DEFAULT_MODEL },
+                    };
+                }
+            } catch (e) { /* ignore */ }
+            return { chats: [], settings: { apiKey: '', model: DEFAULT_MODEL } };
+        }
+
+        function saveToStorage(chats, settings) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ chats, settings }));
+            } catch (e) { /* ignore */ }
+        }
+
+        function getModelInfo(modelId) {
+            return AVAILABLE_MODELS.find(m => m.id === modelId) || null;
+        }
+
+        // ============ ICON COMPONENTS ============
+        const Icons = {
+            Gear: ({ className = 'w-5 h-5' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 1.8 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /
+                >
+                <
+                circle cx = "12"
+                cy = "12"
+                r = "3"
+                strokeLinecap = "round"
+                strokeLinejoin = "round" / >
+                <
+                /svg>
+            ),
+            Trash: ({ className = 'w-4 h-4' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 1.8 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /
+                >
+                <
+                /svg>
+            ),
+            Plus: ({ className = 'w-5 h-5' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 2 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "M12 4.5v15m7.5-7.5h-15" / >
+                <
+                /svg>
+            ),
+            Send: ({ className = 'w-5 h-5' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 2 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" / >
+                <
+                /svg>
+            ),
+            Image: ({ className = 'w-5 h-5' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 1.8 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Zm16.5-13.5a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" /
+                >
+                <
+                /svg>
+            ),
+            Close: ({ className = 'w-5 h-5' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 2 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "M6 18 18 6M6 6l12 12" / >
+                <
+                /svg>
+            ),
+            Menu: ({ className = 'w-5 h-5' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 2 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" / >
+                <
+                /svg>
+            ),
+            Sparkle: ({ className = 'w-5 h-5' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 1.8 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456Z" /
+                >
+                <
+                /svg>
+            ),
+            Paperclip: ({ className = 'w-5 h-5' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 1.8 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01a2.25 2.25 0 0 1-3.182-3.182L15.318 5.191" /
+                >
+                <
+                /svg>
+            ),
+            Eye: ({ className = 'w-4 h-4' } = {}) => ( <
+                svg className = { className }
+                fill = "none"
+                stroke = "currentColor"
+                strokeWidth = { 1.8 }
+                viewBox = "0 0 24 24" >
+                <
+                path strokeLinecap = "round"
+                strokeLinejoin = "round"
+                d = "M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /
+                >
+                <
+                circle cx = "12"
+                cy = "12"
+                r = "3"
+                strokeLinecap = "round"
+                strokeLinejoin = "round" / >
+                <
+                /svg>
+            ),
+        };
+
+        // ============ APP COMPONENT ============
+        function App() {
+            const initialData = useRef(loadFromStorage()).current;
+            const [chats, setChats] = useState(initialData.chats);
+            const [settings, setSettings] = useState(initialData.settings);
+            const [activeChatId, setActiveChatId] = useState(null);
+            const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
+            const [settingsOpen, setSettingsOpen] = useState(false);
+            const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+            const activeChat = activeChatId ? chats.find(c => c.id === activeChatId) : null;
+
+            // Persist to localStorage whenever chats or settings change
+            useEffect(() => {
+                saveToStorage(chats, settings);
+            }, [chats, settings]);
+
+            // Handle window resize for responsive sidebar
+            useEffect(() => {
+                const handleResize = () => {
+                    const mobile = window.innerWidth <= 768;
+                    setIsMobile(mobile);
+                    if (!mobile && !sidebarOpen) {
+                        setSidebarOpen(true);
+                    }
+                    if (mobile && sidebarOpen) {
+                        setSidebarOpen(false);
+                    }
+                };
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, [sidebarOpen]);
+
+            const createNewChat = useCallback(() => {
+                const newChat = {
+                    id: generateId(),
+                    title: 'New Chat',
+                    messages: [],
+                    createdAt: new Date().toISOString(),
+                };
+                setChats(prev => [newChat, ...prev]);
+                setActiveChatId(newChat.id);
+                if (isMobile) setSidebarOpen(false);
+            }, [isMobile]);
+
+            const deleteChat = useCallback((chatId, e) => {
+                e.stopPropagation();
+                setChats(prev => prev.filter(c => c.id !== chatId));
+                if (activeChatId === chatId) {
+                    setActiveChatId(null);
+                }
+            }, [activeChatId]);
+
+            const updateChatTitle = useCallback((chatId, firstMessage) => {
+                const title = firstMessage.length > 40 ?
+                    firstMessage.substring(0, 40).trim() + '...' :
+                    firstMessage.trim();
+                setChats(prev => prev.map(c =>
+                    c.id === chatId && c.title === 'New Chat' ? { ...c, title } : c
+                ));
+            }, []);
+
+            const addMessageToChat = useCallback((chatId, message) => {
+                setChats(prev => prev.map(c => {
+                    if (c.id === chatId) {
+                        const updatedMessages = [...c.messages, message];
+                        return { ...c, messages: updatedMessages };
+                    }
+                    return c;
+                }));
+            }, []);
+
+            const updateLastAssistantMessage = useCallback((chatId, content) => {
+                setChats(prev => prev.map(c => {
+                    if (c.id === chatId) {
+                        const messages = [...c.messages];
+                        if (messages.length > 0 && messages[messages.length - 1].role ===
+                            'assistant') {
+                            messages[messages.length - 1] = {
+                                ...messages[messages.length - 1],
+                                content: content,
+                            };
+                        }
+                        return { ...c, messages };
+                    }
+                    return c;
+                }));
+            }, []);
+
+            const saveSettings = useCallback((newApiKey, newModel) => {
+                const updated = { apiKey: newApiKey, model: newModel };
+                setSettings(updated);
+                saveToStorage(chats, updated);
+                setSettingsOpen(false);
+            }, [chats]);
+
+            return ( <
+                div className = "flex h-screen w-screen overflow-hidden bg-main text-gray-100" > { /* Mobile overlay */ } {
+                    isMobile && ( <
+                        div className = { `sidebar-overlay ${sidebarOpen ? 'open' : ''}` }
+                        onClick = {
+                            () => setSidebarOpen(false) }
+                        />
+                    )
+                }
+
+                { /* Sidebar */ } <
+                Sidebar chats = { chats }
+                activeChatId = { activeChatId }
+                sidebarOpen = { sidebarOpen }
+                isMobile = { isMobile }
+                onNewChat = { createNewChat }
+                onSelectChat = {
+                    (id) => { setActiveChatId(id); if (isMobile) setSidebarOpen(false); } }
+                onDeleteChat = { deleteChat }
+                onClose = { () => setSidebarOpen(false) }
+                />
+
+                { /* Main Area */ } <
+                div className = "flex-1 flex flex-col min-w-0 relative" > { /* Top Bar */ } <
+                TopBar sidebarOpen = { sidebarOpen }
+                onToggleSidebar = { () => setSidebarOpen(prev => !prev) }
+                onOpenSettings = { () => setSettingsOpen(true) }
+                activeChat = { activeChat }
+                />
+
+                { /* Content */ } {
+                    activeChat ? ( <
+                        ChatView chat = { activeChat }
+                        settings = { settings }
+                        onAddMessage = { addMessageToChat }
+                        onUpdateTitle = { updateChatTitle }
+                        onUpdateAssistant = { updateLastAssistantMessage }
+                        />
+                    ) : ( <
+                        HomeScreen onNewChat = { createNewChat }
+                        settings = { settings }
+                        onAddMessage = { addMessageToChat }
+                        onUpdateTitle = { updateChatTitle }
+                        onUpdateAssistant = { updateLastAssistantMessage }
+                        onSetActiveChat = { setActiveChatId }
+                        />
+                    )
+                }
+
+                { /* Settings Modal */ } {
+                    settingsOpen && ( <
+                        SettingsModal settings = { settings }
+                        onSave = { saveSettings }
+                        onClose = { () => setSettingsOpen(false) }
+                        />
+                    )
+                } <
+                /div> <
+                /div>
+            );
+        }
+
+        // ============ SIDEBAR ============
+        function Sidebar({ chats, activeChatId, sidebarOpen, isMobile, onNewChat, onSelectChat, onDeleteChat,
+            onClose }) {
+            const sidebarRef = useRef(null);
+
+            const sidebarClasses = isMobile ?
+                `sidebar-mobile ${sidebarOpen ? 'open' : ''} w-72 bg-sidebar flex flex-col h-full shadow-2xl` :
+                `sidebar-transition ${sidebarOpen ? 'w-72' : 'w-0 opacity-0 pointer-events-none'} bg-sidebar flex flex-col h-full shadow-xl overflow-hidden`;
+
+            return ( <
+                div ref = { sidebarRef }
+                className = { sidebarClasses } >
+                <
+                div className = "flex items-center justify-between p-4 border-b border-gray-700/50 flex-shrink-0" >
+                <
+                span className = "font-semibold text-sm text-gray-200 tracking-wide" > Chat History < /span> <
+                div className = "flex items-center gap-1" >
+                <
+                button onClick = { onNewChat }
+                className = "p-1.5 rounded-lg hover:bg-gray-700/60 transition-colors text-gray-400 hover:text-white"
+                title = "New Chat" >
+                <
+                Icons.Plus className = "w-4 h-4" / >
+                <
+                /button> {
+                    isMobile && ( <
+                        button onClick = { onClose }
+                        className = "p-1.5 rounded-lg hover:bg-gray-700/60 transition-colors text-gray-400 hover:text-white" >
+                        <
+                        Icons.Close className = "w-4 h-4" / >
+                        <
+                        /button>
+                    )
+                } <
+                /div> <
+                /div> <
+                div className = "flex-1 overflow-y-auto scrollbar-thin py-2 px-2 space-y-1" > {
+                    chats.length === 0 ? ( <
+                        div className = "text-center text-gray-500 text-xs py-8 px-4" >
+                        No conversations yet.Start a new chat! <
+                        /div>
+                    ) : (
+                        chats.map(chat => ( <
+                            div key = { chat.id }
+                            onClick = { () => onSelectChat(chat.id) }
+                            className = { `group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all text-sm ${activeChatId === chat.id ? 'bg-gray-700/70 text-white' : 'text-gray-300 hover:bg-gray-700/40 hover:text-white'}` } >
+                            <
+                            span className = "flex-1 truncate text-xs" > { chat.title } < /span> <
+                            button onClick = {
+                                (e) => onDeleteChat(chat.id, e) }
+                            className = "opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-all flex-shrink-0"
+                            title = "Delete chat" >
+                            <
+                            Icons.Trash className = "w-3.5 h-3.5" / >
+                            <
+                            /button> <
+                            /div>
+                        ))
+                    )
+                } <
+                /div> <
+                div className = "p-3 border-t border-gray-700/50 flex-shrink-0" >
+                <
+                div className = "text-xs text-gray-500 text-center" >
+                UMAIR AI STUDIO < span className = "text-gray-600" > v1 .0 < /span> <
+                    /div> <
+                    /div> <
+                    /div>
+                );
+            }
+
+            // ============ TOP BAR ============
+            function TopBar({ sidebarOpen, onToggleSidebar, onOpenSettings, activeChat }) {
+                return ( <
+                    div className = "flex items-center justify-between px-4 py-3 border-b border-gray-700/30 flex-shrink-0 bg-main/80 backdrop-blur-sm z-10" >
+                    <
+                    div className = "flex items-center gap-3" >
+                    <
+                    button onClick = { onToggleSidebar }
+                    className = "p-1.5 rounded-lg hover:bg-gray-700/50 transition-colors text-gray-400 hover:text-white" >
+                    <
+                    Icons.Menu className = "w-5 h-5" / >
+                    <
+                    /button> {
+                        activeChat && ( <
+                            span className = "text-sm font-medium text-gray-300 truncate max-w-[200px] sm:max-w-[400px]" > { activeChat.title } <
+                            /span>
+                        )
+                    } <
+                    /div> <
+                    button onClick = { onOpenSettings }
+                    className = "p-2 rounded-lg hover:bg-gray-700/50 transition-colors text-gray-400 hover:text-white"
+                    title = "Settings" >
+                    <
+                    Icons.Gear className = "w-5 h-5" / >
+                    <
+                    /button> <
+                    /div>
+                );
+            }
+
+            // ============ HOME SCREEN ============
+            function HomeScreen({ onNewChat, settings, onAddMessage, onUpdateTitle, onUpdateAssistant,
+                onSetActiveChat }) {
+                const [inputValue, setInputValue] = useState('');
+                const [uploadedImage, setUploadedImage] = useState(null);
+                const [isLoading, setIsLoading] = useState(false);
+                const imageInputRef = useRef(null);
+
+                const handleSend = useCallback(async (text, image) => {
+                    if (!text.trim() && !image) return;
+                    if (isLoading) return;
+
+                    const chatId = generateId();
+                    const newChat = {
+                        id: chatId,
+                        title: 'New Chat',
+                        messages: [],
+                        createdAt: new Date().toISOString(),
+                    };
+
+                    // We need to add the chat first
+                    onSetActiveChat(chatId);
+                    // The chat will be created via the parent, but we manage messages here
+                    // Actually, we need to create the chat in the parent first
+                    // Let's handle this by calling a special flow
+                    setIsLoading(true);
+
+                    // We'll use the parent's state via the callback pattern
+                    // For the home screen, we trigger the parent to create a chat and then send
+                    onNewChat();
+                    // Hmm, this is tricky with state timing. Let me restructure.
+                    // I'll use a ref to track the new chat ID and handle it in the chat view instead.
+                    // Actually, let me simplify: Home screen directly navigates to a new chat view
+                    // and the ChatView handles sending. So I'll make the suggestion click create a new chat
+                    // and navigate to it, then the ChatView will handle the actual send.
+                    // For direct input on home screen, same flow.
+
+                    // Simpler approach: create chat, navigate, then ChatView handles sending
+                }, [isLoading, onNewChat, onSetActiveChat]);
+
+                const handleSuggestionClick = useCallback((prompt) => {
+                    // Create a new chat and immediately send the suggestion as first message
+                    const chatId = generateId();
+                    const newChat = {
+                        id: chatId,
+                        title: prompt.length > 40 ? prompt.substring(0, 40).trim() + '...' : prompt.trim(),
+                        messages: [{ role: 'user', content: prompt, image: null }],
+                        createdAt: new Date().toISOString(),
+                    };
+                    // We need to add this chat to the parent
+                    // This is handled through the parent's state
+                    onSetActiveChat(chatId);
+                    // The ChatView will pick this up, but the chat needs to exist in the chats array
+                    // I'll handle this via a different mechanism
+                    // Actually, let me have the HomeScreen just create the chat with the first message
+                    // and let ChatView handle the AI response
+                    window._pendingChat = newChat;
+                    onNewChat();
+                    setTimeout(() => {
+                        window._pendingChat = null;
+                    }, 100);
+                }, [onNewChat, onSetActiveChat]);
+
+                // For now, let me simplify: clicking a suggestion or sending from home
+                // creates a new chat and delegates to ChatView
+                const handleQuickSend = useCallback((prompt) => {
+                    const chatId = generateId();
+                    const newChat = {
+                        id: chatId,
+                        title: prompt.length > 40 ? prompt.substring(0, 40).trim() + '...' : prompt.trim(),
+                        messages: [{ role: 'user', content: prompt, image: null, timestamp: Date.now() }],
+                        createdAt: new Date().toISOString(),
+                    };
+                    // Store temporarily so the parent can pick it up
+                    window._pendingNewChat = newChat;
+                    onSetActiveChat(chatId);
+                }, [onSetActiveChat]);
+
+                return ( <
+                    div className = "flex-1 flex flex-col items-center justify-center overflow-y-auto px-4 py-8" >
+                    <
+                    div className = "flex flex-col items-center max-w-2xl w-full mx-auto" > { /* Logo & Title */ } <
+                    div className = "mb-10 text-center animate-fade-in" >
+                    <
+                    div className = "inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-emerald-400 mb-5 shadow-lg shadow-accent/20" >
+                    <
+                    Icons.Sparkle className = "w-8 h-8 text-white" / >
+                    <
+                    /div> <
+                    h1 className = "text-3xl sm:text-4xl font-bold text-white tracking-tight mb-2" >
+                    UMAIR AI STUDIO
+                    <
+                    /h1> <
+                    p className = "text-gray-400 text-sm sm:text-base" >
+                    Advanced AI Chat with Multimodal Vision
+                    <
+                    /p> <
+                    /div>
+
+                    { /* Suggestion Cards */ } <
+                    div className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full mb-8" > {
+                        SUGGESTIONS.map((suggestion, index) => ( <
+                            button key = { index }
+                            onClick = { () => handleQuickSend(suggestion.prompt) }
+                            className = { `group relative p-4 rounded-xl border bg-gradient-to-br ${suggestion.color} text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-lg cursor-pointer` } >
+                            <
+                            span className = "text-2xl mb-2 block" > { suggestion.icon } < /span> <
+                            span className = "text-sm font-medium text-gray-200 block mb-1" > { suggestion.title } <
+                            /span> <
+                            span className = "text-xs text-gray-400 line-clamp-2 block" > { suggestion.prompt } <
+                            /span> <
+                            /button>
+                        ))
+                    } <
+                    /div>
+
+                    { /* Quick Input */ } <
+                    div className = "w-full" >
+                    <
+                    ChatInput value = { inputValue }
+                    onChange = { setInputValue }
+                    onSend = {
+                        (text, image) => {
+                            if (text.trim() || image) {
+                                handleQuickSend(text || 'Analyze this image');
+                            }
+                        }
+                    }
+                    isLoading = { false }
+                    uploadedImage = { null }
+                    onImageUpload = { () => {} }
+                    onImageRemove = { () => {} }
+                    placeholder = "Send a message to start..."
+                    disabled = { false }
+                    /> <
+                    /div> <
+                    /div> <
+                    /div>
+                );
+            }
+
+            // ============ CHAT VIEW ============
+            function ChatView({ chat, settings, onAddMessage, onUpdateTitle, onUpdateAssistant }) {
+                const [inputValue, setInputValue] = useState('');
+                const [uploadedImage, setUploadedImage] = useState(null);
+                const [isLoading, setIsLoading] = useState(false);
+                const messagesEndRef = useRef(null);
+                const imageInputRef = useRef(null);
+                const hasSentInitial = useRef(false);
+
+                const messages = chat?.messages || [];
+
+                // Auto-scroll to bottom
+                useEffect(() => {
+                    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, [messages, isLoading]);
+
+                // Handle pending chat from home screen
+                useEffect(() => {
+                    if (window._pendingNewChat && window._pendingNewChat.id === chat?.id && !hasSentInitial
+                        .current) {
+                        hasSentInitial.current = true;
+                        const pendingChat = window._pendingNewChat;
+                        window._pendingNewChat = null;
+                        // The chat needs to exist with its first message
+                        // We send the AI request for the first message
+                        if (pendingChat.messages.length > 0) {
+                            const firstMsg = pendingChat.messages[0];
+                            sendToAI(firstMsg.content, firstMsg.image, chat.id, pendingChat.messages);
+                        }
+                    }
+                }, [chat?.id]);
+
+                const sendToAI = useCallback(async (text, image, chatId, currentMessages) => {
+                    if (!settings.apiKey) {
+                        const errorMsg = {
+                            role: 'assistant',
+                            content: '⚠️ Please configure your OpenRouter API key in Settings (gear icon) to start chatting.',
+                            timestamp: Date.now(),
+                        };
+                        onAddMessage(chatId, errorMsg);
+                        return;
+                    }
+
+                    setIsLoading(true);
+
+                    // Build the user message
+                    const userMsg = {
+                        role: 'user',
+                        content: text || 'Analyze this image',
+                        image: image,
+                        timestamp: Date.now(),
+                    };
+
+                    // Add user message
+                    onAddMessage(chatId, userMsg);
+
+                    // Update title if this is the first message
+                    if (currentMessages.length === 0) {
+                        onUpdateTitle(chatId, text || 'Image analysis');
+                    }
+
+                    // Add placeholder assistant message
+                    const assistantMsg = {
+                        role: 'assistant',
+                        content: '',
+                        timestamp: Date.now(),
+                    };
+                    onAddMessage(chatId, assistantMsg);
+
+                    // Build API request payload
+                    const modelInfo = getModelInfo(settings.model);
+                    const messagesForAPI = [];
+
+                    // Add all previous messages (excluding the placeholder assistant message)
+                    const allMsgs = [...currentMessages, userMsg];
+                    for (const msg of allMsgs) {
+                        if (msg.role === 'user') {
+                            if (msg.image) {
+                                messagesForAPI.push({
+                                    role: 'user',
+                                    content: [
+                                        { type: 'text', text: msg.content || 'Analyze this image' },
+                                        { type: 'image_url', image_url: { url: msg.image } },
+                                    ],
+                                });
+                            } else {
+                                messagesForAPI.push({
+                                    role: 'user',
+                                    content: msg.content,
+                                });
+                            }
+                        } else if (msg.role === 'assistant' && msg.content) {
+                            messagesForAPI.push({
+                                role: 'assistant',
+                                content: msg.content,
+                            });
+                        }
+                    }
+
+                    // If the user uploaded an image but the model doesn't support vision, warn
+                    if (image && modelInfo && !modelInfo.vision) {
+                        const warningMsg = {
+                            role: 'assistant',
+                            content: '⚠️ **Note:** The selected model (' + modelInfo.name +
+                                ') does not support vision/image analysis. The image was sent but may be ignored. Consider switching to a vision-capable model like GPT-4o, Claude 3.5 Sonnet, or Gemini Flash.',
+                            timestamp: Date.now(),
+                        };
+                        // Replace the placeholder
+                        onUpdateAssistant(chatId, warningMsg.content);
+                        // Still try to send
+                    }
+
+                    try {
+                        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${settings.apiKey}`,
+                                'HTTP-Referer': window.location.origin,
+                                'X-Title': 'UMAIR AI STUDIO',
+                            },
+                            body: JSON.stringify({
+                                model: settings.model,
+                                messages: messagesForAPI,
+                                stream: true,
+                                max_tokens: 4096,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({}));
+                            throw new Error(
+                                errorData.error?.message || `API Error: ${response.status} ${response.statusText}`
+                            );
+                        }
+
+                        // Handle streaming response
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+                        let fullContent = '';
+                        let buffer = '';
+
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop() || '';
+
+                            for (const line of lines) {
+                                const trimmed = line.trim();
+                                if (trimmed.startsWith('data: ')) {
+                                    const dataStr = trimmed.substring(6);
+                                    if (dataStr === '[DONE]') continue;
+                                    try {
+                                        const parsed = JSON.parse(dataStr);
+                                        const delta = parsed?.choices?.[0]?.delta?.content;
+                                        if (delta) {
+                                            fullContent += delta;
+                                            onUpdateAssistant(chatId, fullContent);
+                                        }
+                                    } catch (e) { /* skip malformed JSON */ }
+                                }
+                            }
+                        }
+
+                        // If no content was received
+                        if (!fullContent) {
+                            onUpdateAssistant(chatId,
+                                'No response received. The model may not support this type of request.');
+                        }
+                    } catch (error) {
+                        console.error('API Error:', error);
+                        onUpdateAssistant(chatId, `❌ **Error:** ${error.message}\n\nPlease check your API key and try again.`
+                        );
+                    } finally {
+                        setIsLoading(false);
+                    }
+                }, [settings, onAddMessage, onUpdateTitle, onUpdateAssistant]);
+
+                const handleSend = useCallback((text, image) => {
+                    if (!text.trim() && !image) return;
+                    if (isLoading) return;
+                    sendToAI(text, image, chat.id, messages);
+                    setInputValue('');
+                    setUploadedImage(null);
+                }, [isLoading, sendToAI, chat?.id, messages]);
+
+                const handleImageUpload = useCallback((e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    // Check file size (max ~8MB)
+                    if (file.size > 8 * 1024 * 1024) {
+                        alert('Image size should be less than 8MB.');
+                        return;
+                    }
+
+                    // Check file type
+                    if (!file.type.startsWith('image/')) {
+                        alert('Please select an image file.');
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setUploadedImage(event.target.result);
+                    };
+                    reader.readAsDataURL(file);
+
+                    // Reset input
+                    if (imageInputRef.current) {
+                        imageInputRef.current.value = '';
+                    }
+                }, []);
+
+                return ( <
+                    div className = "flex-1 flex flex-col min-h-0 relative" > { /* Messages Area */ } <
+                    div className = "flex-1 overflow-y-auto scrollbar-thin px-4 py-6" >
+                    <
+                    div className = "max-w-3xl mx-auto space-y-5" > {
+                        messages.length === 0 && !isLoading ? ( <
+                            div className = "text-center text-gray-500 py-20" >
+                            <
+                            p className = "text-lg" > Start a conversation < /p> <
+                            p className = "text-sm mt-2" > Type a message below or upload an image
+                            for analysis. < /p> <
+                            /div>
+                        ) : (
+                            messages.map((msg, index) => ( <
+                                MessageBubble key = { index }
+                                message = { msg }
+                                isLast = { index === messages.length - 1 }
+                                isLoading = { isLoading && index === messages.length - 1 && msg.role ===
+                                    'assistant' && !msg.content }
+                                />
+                            ))
+                        )
+                    } {
+                        isLoading && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' &&
+                            messages[messages.length - 1]?.content && ( <
+                                div className = "flex items-center gap-2 text-gray-500 pl-1" >
+                                <
+                                span className = "text-xs" > Generating < /span> <
+                                span className = "flex gap-1" >
+                                <
+                                span className = "w-1.5 h-1.5 bg-gray-500 rounded-full pulse-dot" > < /span> <
+                                span className = "w-1.5 h-1.5 bg-gray-500 rounded-full pulse-dot" > < /span> <
+                                span className = "w-1.5 h-1.5 bg-gray-500 rounded-full pulse-dot" > < /span> <
+                                /span> <
+                                /div>
+                            )
+                    } <
+                    div ref = { messagesEndRef }
+                    /> <
+                    /div> <
+                    /div>
+
+                    { /* Input Area */ } <
+                    div className = "flex-shrink-0 px-4 pb-4 pt-2" >
+                    <
+                    div className = "max-w-3xl mx-auto" >
+                    <
+                    ChatInput value = { inputValue }
+                    onChange = { setInputValue }
+                    onSend = { handleSend }
+                    isLoading = { isLoading }
+                    uploadedImage = { uploadedImage }
+                    onImageUpload = { handleImageUpload }
+                    onImageRemove = { () => setUploadedImage(null) }
+                    imageInputRef = { imageInputRef }
+                    placeholder = "Message UMAIR AI..."
+                    disabled = { isLoading }
+                    /> <
+                    /div> <
+                    /div> <
+                    /div>
+                );
+            }
+
+            // ============ MESSAGE BUBBLE ============
+            function MessageBubble({ message, isLast, isLoading }) {
+                const isUser = message.role === 'user';
+                const isAssistant = message.role === 'assistant';
+
+                if (isLoading && isAssistant && !message.content) {
+                    return ( <
+                        div className = "flex items-start gap-3 animate-fade-in" >
+                        <
+                        div className = "w-8 h-8 rounded-full bg-gradient-to-br from-accent to-emerald-400 flex items-center justify-center flex-shrink-0 shadow-md" >
+                        <
+                        Icons.Sparkle className = "w-4 h-4 text-white" / >
+                        <
+                        /div> <
+                        div className = "flex items-center gap-2 py-3 px-4 rounded-2xl bg-gray-700/30" >
+                        <
+                        span className = "flex gap-1.5" >
+                        <
+                        span className = "w-2 h-2 bg-gray-400 rounded-full pulse-dot" > < /span> <
+                        span className = "w-2 h-2 bg-gray-400 rounded-full pulse-dot" > < /span> <
+                        span className = "w-2 h-2 bg-gray-400 rounded-full pulse-dot" > < /span> <
+                        /span> <
+                        /div> <
+                        /div>
+                    );
+                }
+
+                return ( <
+                    div className = { `flex items-start gap-3 animate-fade-in ${isUser ? 'flex-row-reverse' : ''}` } >
+                    { /* Avatar */ } {
+                        isUser ? ( <
+                            div className =
+                            "w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-gray-200" >
+                            U <
+                            /div>
+                        ) : ( <
+                            div className =
+                            "w-8 h-8 rounded-full bg-gradient-to-br from-accent to-emerald-400 flex items-center justify-center flex-shrink-0 shadow-md" >
+                            <
+                            Icons.Sparkle className = "w-4 h-4 text-white" / >
+                            <
+                            /div>
+                        )
+                    }
+
+                    { /* Content */ } <
+                    div className = { `max-w-[75%] sm:max-w-[70%] ${isUser ? 'text-right' : 'text-left'}` } >
+                    { /* Image preview for user messages */ } {
+                        message.image && ( <
+                            div className = { `${isUser ? 'ml-auto' : ''} mb-2 max-w-[280px] sm:max-w-[320px]` } >
+                            <
+                            img src = { message.image }
+                            alt = "Uploaded"
+                            className = "rounded-xl border border-gray-600/50 shadow-lg w-full h-auto max-h-60 object-contain bg-gray-800/50" /
+                            >
+                            <
+                            /div>
+                        )
+                    }
+
+                    { /* Text bubble */ } {
+                        message.content && ( <
+                            div className = { `inline-block px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isUser ? 'bg-bubble text-gray-100 rounded-tr-md' : 'bg-gray-700/40 text-gray-100 rounded-tl-md'}` }
+                            dangerouslySetInnerHTML = {
+                                { __html: formatMessageContent(message.content) } }
+                            />
+                        )
+                    } <
+                    /div> <
+                    /div>
+                );
+            }
+
+            function formatMessageContent(content) {
+                if (!content) return '';
+                // Simple markdown-like formatting
+                let formatted = content
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-white">$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/`{3}(\w*)\n?([\s\S]*?)`{3}/g,
+                        '<pre class="bg-gray-800/80 rounded-lg p-3 my-2 overflow-x-auto text-xs"><code class="text-gray-200">$2</code></pre>'
+                        )
+                    .replace(/`([^`]+)`/g,
+                        '<code class="bg-gray-800/80 px-1.5 py-0.5 rounded text-xs text-accent">$1</code>')
+                    .replace(/\n/g, '<br/>');
+                return formatted;
+            }
+
+            // ============ CHAT INPUT ============
+            function ChatInput({ value, onChange, onSend, isLoading, uploadedImage, onImageUpload, onImageRemove,
+                imageInputRef, placeholder, disabled }) {
+                const textareaRef = useRef(null);
+                const localImageRef = useRef(null);
+                const actualImageRef = imageInputRef || localImageRef;
+
+                const handleKeyDown = useCallback((e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if ((value.trim() || uploadedImage) && !isLoading && !disabled) {
+                            onSend(value, uploadedImage);
+                        }
+                    }
+                }, [value, uploadedImage, isLoading, disabled, onSend]);
+
+                const handleSendClick = useCallback(() => {
+                    if ((value.trim() || uploadedImage) && !isLoading && !disabled) {
+                        onSend(value, uploadedImage);
+                    }
+                }, [value, uploadedImage, isLoading, disabled, onSend]);
+
+                // Auto-resize textarea
+                useEffect(() => {
+                    const textarea = textareaRef.current;
+                    if (textarea) {
+                        textarea.style.height = 'auto';
+                        textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+                    }
+                }, [value]);
+
+                return ( <
+                    div className = "relative" > { /* Image Preview */ } {
+                        uploadedImage && ( <
+                            div className =
+                            "mb-3 flex items-center gap-2 p-2 bg-gray-700/40 rounded-xl border border-gray-600/30 max-w-xs" >
+                            <
+                            img src = { uploadedImage }
+                            alt = "Preview"
+                            className = "w-12 h-12 rounded-lg object-cover border border-gray-600/30" /
+                            >
+                            <
+                            span className = "text-xs text-gray-300 flex-1 truncate" > Image ready
+                            for analysis < /span> <
+                            button onClick = { onImageRemove }
+                            className = "p-1 rounded-lg hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors" >
+                            <
+                            Icons.Close className = "w-4 h-4" / >
+                            <
+                            /button> <
+                            /div>
+                        )
+                    }
+
+                    { /* Input Container */ } <
+                    div className =
+                        "flex items-end gap-2 bg-input rounded-2xl border border-gray-600/40 shadow-lg px-4 py-3 transition-all focus-within:border-gray-500/60 focus-within:shadow-xl" >
+                    { /* Image Upload Button */ } <
+                    button onClick = { () => actualImageRef.current?.click() }
+                    className = "p-2 rounded-xl hover:bg-gray-600/40 transition-colors text-gray-400 hover:text-white flex-shrink-0"
+                    title = "Upload image for analysis" >
+                    <
+                    Icons.Paperclip className = "w-5 h-5" / >
+                    <
+                    /button> <
+                    input ref = { actualImageRef }
+                    type = "file"
+                    accept = "image/*"
+                    onChange = { onImageUpload }
+                    className = "hidden" /
+                    >
+
+                    { /* Text Input */ } <
+                    textarea ref = { textareaRef }
+                    value = { value }
+                    onChange = { (e) => onChange(e.target.value) }
+                    onKeyDown = { handleKeyDown }
+                    placeholder = { placeholder || 'Message UMAIR AI...' }
+                    disabled = { disabled }
+                    rows = { 1 }
+                    className =
+                        "flex-1 bg-transparent text-gray-100 placeholder-gray-500 text-sm py-1.5 px-1 outline-none max-h-[200px]"
+                    />
+
+                    { /* Send Button */ } <
+                    button onClick = { handleSendClick }
+                    disabled = { (!value.trim() && !uploadedImage) || isLoading || disabled }
+                    className = { `p-2 rounded-xl flex-shrink-0 transition-all ${(value.trim() || uploadedImage) && !isLoading && !disabled ? 'bg-accent text-white hover:bg-accent-hover shadow-md shadow-accent/25' : 'bg-gray-600/30 text-gray-500 cursor-not-allowed'}` }
+                    title = "Send message" >
+                    <
+                    Icons.Send className = "w-5 h-5" / >
+                    <
+                    /button> <
+                    /div>
+
+                    { /* Hint */ } <
+                    div className = "text-center mt-2 text-xs text-gray-500" >
+                    Press Enter to send, Shift + Enter
+                    for new line
+                    <
+                    /div> <
+                    /div>
+                );
+            }
+
+            // ============ SETTINGS MODAL ============
+            function SettingsModal({ settings, onSave, onClose }) {
+                const [apiKey, setApiKey] = useState(settings.apiKey || '');
+                const [model, setModel] = useState(settings.model || DEFAULT_MODEL);
+                const [showKey, setShowKey] = useState(false);
+                const [saved, setSaved] = useState(false);
+
+                const handleSave = useCallback(() => {
+                    onSave(apiKey.trim(), model);
+                    setSaved(true);
+                    setTimeout(() => setSaved(false), 2000);
+                }, [apiKey, model, onSave]);
+
+                const selectedModelInfo = getModelInfo(model);
+
+                return ( <
+                    div className = "fixed inset-0 z-50 flex items-center justify-center p-4"
+                    onClick = { (e) => { if (e.target === e.currentTarget) onClose(); } } >
+                    <
+                    div className = "absolute inset-0 bg-black/70 backdrop-blur-sm" > < /div> <
+                    div className =
+                    "relative bg-[#1a1a1a] border border-gray-700/50 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-fade-in z-10" >
+                    <
+                    div className = "flex items-center justify-between mb-6" >
+                    <
+                    h2 className = "text-lg font-semibold text-white flex items-center gap-2" >
+                    <
+                    Icons.Gear className = "w-5 h-5 text-gray-400" / >
+                    Settings
+                    <
+                    /h2> <
+                    button onClick = { onClose }
+                    className = "p-1.5 rounded-lg hover:bg-gray-700/50 transition-colors text-gray-400 hover:text-white" >
+                    <
+                    Icons.Close className = "w-5 h-5" / >
+                    <
+                    /button> <
+                    /div>
+
+                    { /* API Key Input */ } <
+                    div className = "mb-5" >
+                    <
+                    label className = "block text-sm font-medium text-gray-300 mb-2" >
+                    OpenRouter API Key
+                    <
+                    /label> <
+                    div className = "relative" >
+                    <
+                    input type = { showKey ? 'text' : 'password' }
+                    value = { apiKey }
+                    onChange = { (e) => setApiKey(e.target.value) }
+                    placeholder = "sk-or-v1-..."
+                    className =
+                        "w-full bg-input border border-gray-600/40 rounded-xl px-4 py-3 pr-12 text-sm text-gray-100 placeholder-gray-500 outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all"
+                    />
+                    <
+                    button onClick = { () => setShowKey(!showKey) }
+                    className = "absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-gray-600/40 transition-colors text-gray-400 hover:text-white"
+                    title = { showKey ? 'Hide API key' : 'Show API key' } >
+                    <
+                    Icons.Eye className = "w-4 h-4" / >
+                    <
+                    /button> <
+                    /div> <
+                    p className = "text-xs text-gray-500 mt-1.5" >
+                    Get your API key at{ ' ' } <
+                    a href = "https://openrouter.ai/keys"
+                    target = "_blank"
+                    rel = "noopener noreferrer"
+                    className = "text-accent hover:underline" > openrouter.ai / keys < /a>
+                        <
+                        /p> <
+                        /div>
+
+                        { /* Model Selector */ } <
+                        div className = "mb-6" >
+                        <
+                        label className = "block text-sm font-medium text-gray-300 mb-2" >
+                        AI Model
+                        <
+                        /label> <
+                        select value = { model }
+                        onChange = { (e) => setModel(e.target.value) }
+                        className =
+                            "w-full bg-input border border-gray-600/40 rounded-xl px-4 py-3 text-sm text-gray-100 outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all appearance-none cursor-pointer"
+                        >
+                        {
+                            AVAILABLE_MODELS.map(m => ( <
+                                option key = { m.id }
+                                value = { m.id } > { m.name } ({ m.provider }) { m.vision ? ' 👁️' : '' } <
+                                /option>
+                            ))
+                        } <
+                        /select> {
+                            selectedModelInfo && ( <
+                                div className = "flex items-center gap-2 mt-2 text-xs text-gray-500" > {
+                                    selectedModelInfo.vision ? ( <
+                                        span className =
+                                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20" >
+                                        <
+                                        span > 👁️ < /span> Vision capable <
+                                        /span>
+                                    ) : ( <
+                                        span className =
+                                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20" >
+                                        <
+                                        span > ⚠️ < /span> Text only <
+                                        /span>
+                                    )
+                                } <
+                                span > •Supported by OpenRouter < /span> <
+                                /div>
+                            )
+                        } <
+                        /div>
+
+                        { /* Save Button */ } <
+                        button onClick = { handleSave }
+                        className = { `w-full py-3 rounded-xl font-medium text-sm transition-all shadow-lg ${saved ? 'bg-green-600 text-white' : 'bg-accent text-white hover:bg-accent-hover shadow-accent/20'}` } >
+                        { saved ? '✓ Settings Saved!' : 'Save Settings' } <
+                        /button>
+
+                        { /* Note */ } <
+                        p className = "text-xs text-gray-500 text-center mt-4" >
+                        Settings are stored locally in your browser. <
+                        /p> <
+                        /div> <
+                        /div>
+                    );
+                }
+
+                // ============ RENDER ============
+                const root = ReactDOM.createRoot(document.getElementById('root'));
+                root.render( < App / > );
+    </script>
+</body>
+</html>
