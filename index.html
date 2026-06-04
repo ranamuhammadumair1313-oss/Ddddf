@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
+        /* ... (all CSS unchanged, except the scroll behaviour fix is in JS) ... */
         :root {
             --bg: #0f0e0d;
             --surface: #1a1816;
@@ -45,7 +46,6 @@
             font-size: 15px;
         }
 
-        /* ── SIDEBAR ── */
         #sidebar {
             width: var(--sidebar-w);
             background: var(--surface);
@@ -157,13 +157,11 @@
         #sidebar.collapsed .sidebar-section-label { display: none; }
         #sidebar.collapsed #sidebarToggle { right: -28px; background: var(--surface2); border-color: var(--border); }
 
-        /* ── MAIN ── */
         #main {
             flex: 1; display: flex; flex-direction: column;
             height: 100%; min-width: 0;
         }
 
-        /* Header */
         #header {
             display: flex; align-items: center; justify-content: space-between;
             padding: 14px 20px; border-bottom: 1px solid var(--border);
@@ -188,7 +186,6 @@
         }
         .header-icon-btn:hover { background: var(--surface2); color: var(--text); }
 
-        /* Scroll area */
         #scrollArea {
             flex: 1;
             overflow-y: auto;
@@ -196,7 +193,6 @@
             display: block;
         }
 
-        /* ── HOME SCREEN ── */
         #homeScreen {
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
@@ -247,7 +243,6 @@
         .card-title { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
         .card-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
 
-        /* ── MESSAGES ── */
         #chatMessages {
             display: none; flex-direction: column;
             max-width: 760px; width: 100%; margin: 0 auto;
@@ -257,7 +252,6 @@
 
         .msg-group { display: flex; flex-direction: column; margin-bottom: 6px; }
 
-        /* User message */
         .msg-user {
             display: flex; justify-content: flex-end;
             padding: 6px 0;
@@ -271,7 +265,6 @@
         }
         .msg-user-bubble img { max-width: 200px; border-radius: 8px; margin-bottom: 6px; display: block; }
 
-        /* AI message */
         .msg-ai {
             display: flex; align-items: flex-start;
             gap: 12px; padding: 10px 0;
@@ -336,7 +329,6 @@
         }
         .action-btn:hover { background: var(--surface2); border-color: var(--border); color: var(--text-muted); }
 
-        /* Thinking bubble */
         .thinking {
             display: flex; align-items: center; gap: 6px;
             color: var(--text-dim); font-size: 13.5px; padding: 4px 0;
@@ -354,7 +346,6 @@
             30% { transform: translateY(-5px); }
         }
 
-        /* ── INPUT AREA ── */
         #inputArea {
             position: absolute; bottom: 0; left: 0; right: 0;
             background: linear-gradient(to top, var(--bg) 60%, transparent);
@@ -424,7 +415,6 @@
             text-align: center; font-size: 11.5px; color: var(--text-dim);
         }
 
-        /* ── SETTINGS MODAL ── */
         #settingsModal {
             display: none; position: fixed; inset: 0;
             background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
@@ -483,7 +473,6 @@
         }
         .modal-tip i { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
 
-        /* Toast */
         #toast {
             position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(16px);
             background: var(--surface); border: 1px solid var(--border);
@@ -536,7 +525,6 @@
 
 <!-- Main -->
 <main id="main">
-    <!-- Header -->
     <header id="header">
         <div class="header-left">
             <button class="header-icon-btn" onclick="toggleSidebar()" title="Toggle sidebar">
@@ -793,7 +781,6 @@
         const cm = document.getElementById('chatMessages');
         cm.innerHTML = '';
         cm.classList.remove('visible');
-        // Reset scroll to top
         const sa = document.getElementById('scrollArea');
         sa.scrollTop = 0;
         renderSidebar();
@@ -808,15 +795,15 @@
         const cm = document.getElementById('chatMessages');
         cm.innerHTML = '';
         cm.classList.add('visible');
-        // Reset scroll before rendering
         const sa = document.getElementById('scrollArea');
         sa.scrollTop = 0;
+        // Append messages without autoscrolling during load
         messages.forEach(m => {
-            if (m.role === 'user') appendUserMsg(typeof m.content === 'string' ? m.content : extractTextContent(m.content));
-            else appendAIMsg(m.content, false);
+            if (m.role === 'user') appendUserMsg(typeof m.content === 'string' ? m.content : extractTextContent(m.content), true);
+            else appendAIMsg(m.content, false, null, true);
         });
-        // Scroll to bottom after load
-        setTimeout(() => { sa.scrollTop = sa.scrollHeight; }, 50);
+        // Force scroll to bottom after all messages are added
+        setTimeout(() => { scrollBottom(true); }, 50);
         renderSidebar(id);
     }
 
@@ -862,16 +849,16 @@
         });
     }
 
-    function appendUserMsg(text) {
+    function appendUserMsg(text, skipScroll = false) {
         const cm = document.getElementById('chatMessages');
         const div = document.createElement('div');
         div.className = 'msg-user';
         div.innerHTML = `<div class="msg-user-bubble">${escapeHtml(text)}</div>`;
         cm.appendChild(div);
-        scrollBottom();
+        if (!skipScroll) scrollBottom(true); // user message always forces scroll to bottom
     }
 
-    function appendAIMsg(content, animate = true, id = null) {
+    function appendAIMsg(content, animate = true, id = null, skipScroll = false) {
         const cm = document.getElementById('chatMessages');
         const div = document.createElement('div');
         div.className = 'msg-ai';
@@ -902,7 +889,7 @@
                 </div>`;
         }
         cm.appendChild(div);
-        scrollBottom();
+        if (!skipScroll) scrollBottom(false); // AI messages only scroll if user is near bottom
         return div;
     }
 
@@ -918,11 +905,20 @@
         return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
     }
 
-    function scrollBottom() {
+    /**
+     * Smart scroll: only scroll to bottom if force=true or user is already near bottom.
+     * This prevents jumping when the user is reading older messages.
+     */
+    function scrollBottom(force = false) {
         const sa = document.getElementById('scrollArea');
-        requestAnimationFrame(() => {
-            sa.scrollTop = sa.scrollHeight + 9999;
-        });
+        // Threshold in pixels: if user is within 40px of the bottom, consider them "at bottom"
+        const threshold = 40;
+        const isNearBottom = sa.scrollHeight - sa.scrollTop - sa.clientHeight < threshold;
+        if (force || isNearBottom) {
+            requestAnimationFrame(() => {
+                sa.scrollTop = sa.scrollHeight;
+            });
+        }
     }
 
     async function sendMessage() {
@@ -954,12 +950,12 @@
         }
         const userContent = contentArray.length === 1 && !currentBase64Image ? text : contentArray;
         messages.push({ role: 'user', content: userContent });
-        appendUserMsg(displayText);
+        appendUserMsg(displayText); // forces scroll
         removeImage();
 
-        // Loading
+        // Loading indicator
         const loadingId = 'ai-loading-' + Date.now();
-        appendAIMsg('__loading__', true, loadingId);
+        appendAIMsg('__loading__', true, loadingId); // conditional scroll
 
         // Build API messages
         const sysPrompt = localStorage.getItem('umair_system_prompt') || '';
