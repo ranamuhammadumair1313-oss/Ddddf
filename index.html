@@ -191,6 +191,7 @@
         /* Scroll area */
         #scrollArea {
             flex: 1; overflow-y: auto; display: flex; flex-direction: column;
+            min-height: 0;
         }
 
         /* ── HOME SCREEN ── */
@@ -789,6 +790,9 @@
         const cm = document.getElementById('chatMessages');
         cm.innerHTML = '';
         cm.classList.remove('visible');
+        // Reset scroll to top
+        const sa = document.getElementById('scrollArea');
+        sa.scrollTop = 0;
         renderSidebar();
     }
 
@@ -801,10 +805,15 @@
         const cm = document.getElementById('chatMessages');
         cm.innerHTML = '';
         cm.classList.add('visible');
+        // Reset scroll before rendering
+        const sa = document.getElementById('scrollArea');
+        sa.scrollTop = 0;
         messages.forEach(m => {
             if (m.role === 'user') appendUserMsg(typeof m.content === 'string' ? m.content : extractTextContent(m.content));
             else appendAIMsg(m.content, false);
         });
+        // Scroll to bottom after load
+        setTimeout(() => { sa.scrollTop = sa.scrollHeight; }, 50);
         renderSidebar(id);
     }
 
@@ -908,7 +917,9 @@
 
     function scrollBottom() {
         const sa = document.getElementById('scrollArea');
-        sa.scrollTop = sa.scrollHeight;
+        requestAnimationFrame(() => {
+            sa.scrollTop = sa.scrollHeight;
+        });
     }
 
     async function sendMessage() {
